@@ -1,0 +1,13 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^@lib/aws(|/.*)$": "<rootDir>/../libs/aws/src/$1",
+    "^@lib/upload(|/.*)$": "<rootDir>/../libs/upload/src/$1"
+  }
+}

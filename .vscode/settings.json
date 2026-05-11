@@ -1,0 +1,22 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "cSpell.words": [
+    "clamav",
+    "clamdscan",
+    "clamscan",
+    "CLUSTERDOWN",
+    "cooldown",
+    "evalsha",
+    "gcra",
+    "INSTREAM",
+    "mozjpeg",
+    "PEXPIRE",
+    "pttl",
+    "unzipper",
+    "ZREMRANGEBYSCORE"
+  ],
+  "[lua]": {
+    "editor.defaultFormatter": "yinfei.luahelper"
+  }
+}
