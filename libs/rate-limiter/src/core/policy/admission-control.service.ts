@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 import { HotKeyShieldService } from './hot-key-shield.service';
 
-// import { ConsumeResultFactory } from '../contracts/consume-result.factory';
-import { ConsumeResult } from '../contracts/result.types';
+import type { ConsumeResult } from '../contracts/result.types';
+
 import { ResultFactory } from '../contracts/result.factory';
 
 @Injectable()
@@ -22,5 +22,13 @@ export class AdmissionControlService {
     }
 
     return ResultFactory.degradedRejected(key, 1000);
+  }
+
+  hotness(key: string): number {
+    return this.hotKeyShield.record(key);
+  }
+
+  shouldLogHotKey(hotness: number): boolean {
+    return hotness >= 5000;
   }
 }

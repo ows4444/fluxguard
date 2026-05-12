@@ -82,13 +82,13 @@ export class RateLimiterCompiler {
       degradedAllowancePerSecond: Math.max(1, Math.floor(config.degradedAllowancePerSecond ?? 10)),
     });
 
-    const exposure = Object.freeze({
+    const exposure: RuntimeSnapshot['exposure'] = {
       exposeInHeaders: config.exposeInHeaders !== false,
+      ...(config.message !== undefined ? { message: config.message } : {}),
+      ...(config.errorCode !== undefined ? { errorCode: config.errorCode } : {}),
+    };
 
-      message: config.message,
-
-      errorCode: config.errorCode,
-    });
+    Object.freeze(exposure);
 
     const adjustments = Object.freeze({
       allowManualAdjustments: config.allowManualAdjustments === true,
@@ -166,8 +166,8 @@ export class RateLimiterCompiler {
       exposure,
       adjustments,
       identity,
-      blocking,
-      progressiveBlocking,
+      ...(blocking !== undefined ? { blocking } : {}),
+      ...(progressiveBlocking !== undefined ? { progressiveBlocking } : {}),
     });
   }
 

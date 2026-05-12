@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { REDIS_CLIENT } from '../../module/tokens';
+import { RATE_LIMITER_REDIS } from '../../module/tokens';
 import type { RedisClient } from '../../redis/types';
 
 @Injectable()
 export class RedisHealthService {
   constructor(
-    @Inject(REDIS_CLIENT)
+    @Inject(RATE_LIMITER_REDIS)
     private readonly redis: RedisClient,
   ) {}
 

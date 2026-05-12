@@ -46,6 +46,7 @@ export class RedisExecutor {
       this.reportHealth();
     }, 10000).unref?.();
   }
+
   private readonly logger = new Logger(RedisExecutor.name);
 
   private readonly timeoutMs = Number(process.env.RATE_LIMITER_REDIS_TIMEOUT_MS ?? 150);
@@ -71,6 +72,8 @@ export class RedisExecutor {
 
     const pool = this.getPool(group);
 
+    this.assertPoolIntegrity(pool);
+
     if (this.shouldShedLoad(pool)) {
       pool.shedExecutions += 1;
 
@@ -87,20 +90,23 @@ export class RedisExecutor {
       });
     }
 
-    if (pool.queueTail - pool.queueHead >= this.maxQueueSize) {
+    if (this.queueSize(pool) >= this.maxQueueSize) {
       pool.rejectedExecutions += 1;
+
       throw new RateLimiterInfrastructureError(
         [
           'Redis executor overloaded',
           `operation=${String(operation)}`,
-          `queue=${pool.queueTail - pool.queueHead}`,
+          `queue=${this.queueSize(pool)}`,
           `maxQueue=${this.maxQueueSize}`,
         ].join(' '),
       );
     }
 
-    return new Promise<T>((resolve, reject) => {
-      pool.queue[pool.queueTail % this.maxQueueSize] = {
+    return await new Promise<T>((resolve, reject) => {
+      const slot = this.queueIndex(pool.queueTail);
+
+      pool.queue[slot] = {
         operation,
 
         fn: fn as () => Promise<unknown>,
@@ -117,35 +123,32 @@ export class RedisExecutor {
       };
 
       pool.queueTail += 1;
+
+      this.assertPoolIntegrity(pool);
     });
   }
 
   private drainQueue(pool: ExecutorPoolState): void {
-    while (pool.activeCount < this.maxConcurrent && pool.queueHead < pool.queueTail) {
-      const idx = pool.queueHead % this.maxQueueSize;
+    while (pool.activeCount < this.maxConcurrent && !this.isQueueEmpty(pool)) {
+      const slot = this.queueIndex(pool.queueHead);
 
-      const item = pool.queue[idx];
+      const item = pool.queue[slot];
 
-      if (item?.signal?.aborted) {
-        pool.queue[idx] = undefined;
+      pool.queue[slot] = undefined;
 
-        pool.queueHead += 1;
+      pool.queueHead += 1;
 
+      if (!item) {
+        continue;
+      }
+
+      if (item.signal?.aborted) {
         const reason = item.signal.reason instanceof Error ? item.signal.reason : new Error('queued_operation_aborted');
 
         item.reject(reason);
 
         continue;
       }
-
-      if (!item) {
-        pool.queueHead += 1;
-        continue;
-      }
-
-      pool.queue[idx] = undefined;
-
-      pool.queueHead += 1;
 
       const now = this.clock.nowMs();
 
@@ -164,7 +167,9 @@ export class RedisExecutor {
       void this.executeNow(pool, item).then(item.resolve).catch(item.reject);
     }
 
-    this.normalizeQueueCounters(pool);
+    this.resetCountersIfEmpty(pool);
+
+    this.assertPoolIntegrity(pool);
   }
 
   private async executeNow<T>(
@@ -181,6 +186,8 @@ export class RedisExecutor {
   ): Promise<T> {
     pool.activeCount += 1;
 
+    this.assertPoolIntegrity(pool);
+
     const startedAt = performance.now();
 
     let settled = false;
@@ -195,6 +202,7 @@ export class RedisExecutor {
           }
 
           settled = true;
+
           fn();
         };
 
@@ -213,12 +221,14 @@ export class RedisExecutor {
           .then((value) => {
             finalize(() => {
               item.signal?.removeEventListener('abort', abortHandler);
+
               resolve(value);
             });
           })
           .catch((err: Error) => {
             finalize(() => {
               item.signal?.removeEventListener('abort', abortHandler);
+
               reject(err);
             });
           });
@@ -234,6 +244,7 @@ export class RedisExecutor {
             );
           });
         }, this.timeoutMs);
+
         timeoutId.unref?.();
       });
     } catch (err) {
@@ -246,6 +257,8 @@ export class RedisExecutor {
       }
 
       this.drainQueue(pool);
+
+      this.assertPoolIntegrity(pool);
 
       const duration = performance.now() - startedAt;
 
@@ -282,8 +295,7 @@ export class RedisExecutor {
   }
 
   private shouldShedLoad(pool: ExecutorPoolState): boolean {
-    const utilization =
-      (pool.activeCount + (pool.queueTail - pool.queueHead)) / (this.maxConcurrent + this.maxQueueSize);
+    const utilization = (pool.activeCount + this.queueSize(pool)) / (this.maxConcurrent + this.maxQueueSize);
 
     if (utilization >= this.overloadThreshold) {
       if (!pool.overloadSince) {
@@ -294,7 +306,7 @@ export class RedisExecutor {
     }
 
     if (pool.overloadSince && this.clock.nowMs() - pool.overloadSince > this.overloadCooldownMs) {
-      pool.overloadSince = undefined;
+      delete pool.overloadSince;
     }
 
     return false;
@@ -310,7 +322,7 @@ export class RedisExecutor {
 
   private reportHealth(): void {
     for (const [group, pool] of this.pools.entries()) {
-      const queued = pool.queueTail - pool.queueHead;
+      const queued = this.queueSize(pool);
 
       if (
         queued === 0 &&
@@ -338,15 +350,38 @@ export class RedisExecutor {
     }
   }
 
-  private normalizeQueueCounters(pool: ExecutorPoolState): void {
-    if (pool.queueHead === pool.queueTail) {
-      pool.queueHead = 0;
-      pool.queueTail = 0;
+  private queueSize(pool: ExecutorPoolState): number {
+    return pool.queueTail - pool.queueHead;
+  }
+
+  private isQueueEmpty(pool: ExecutorPoolState): boolean {
+    return pool.queueHead === pool.queueTail;
+  }
+
+  private queueIndex(position: number): number {
+    return position % this.maxQueueSize;
+  }
+
+  private resetCountersIfEmpty(pool: ExecutorPoolState): void {
+    if (!this.isQueueEmpty(pool)) {
+      return;
     }
 
-    pool.queueTail -= pool.queueHead;
-
     pool.queueHead = 0;
+
+    pool.queueTail = 0;
+  }
+
+  private assertPoolIntegrity(pool: ExecutorPoolState): void {
+    if (process.env.NODE_ENV === 'production') {
+      return;
+    }
+
+    const size = this.queueSize(pool);
+
+    if (size < 0 || size > this.maxQueueSize) {
+      throw new Error(`RedisExecutor queue invariant violated size=${size}`);
+    }
   }
 
   private getPool(group = 'default'): ExecutorPoolState {

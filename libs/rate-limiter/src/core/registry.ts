@@ -1,54 +1,35 @@
 import { Injectable } from '@nestjs/common';
+import { RateLimiterConfigurationError } from '../errors/rate-limiter.errors';
 import type {
-  RuntimeExecutionPolicy,
-  RuntimeResiliencePolicy,
-  RuntimeExposurePolicy,
   RuntimeAdjustmentPolicy,
-  RuntimeIdentityPolicy,
   RuntimeBlockingPolicy,
+  RuntimeExecutionPolicy,
+  RuntimeExposurePolicy,
+  RuntimeIdentityPolicy,
   RuntimeLimiterConfig,
   RuntimeProgressiveBlockingPolicy,
+  RuntimeResiliencePolicy,
 } from '../module/rate-limiter.interfaces';
 
-import { type LimiterAlgorithm } from '../algorithms/contracts';
-import { RateLimiterConfigurationError } from '../errors/rate-limiter.errors';
-import { deepFreeze } from './utils/deep-freeze';
+import type { LimiterAlgorithm } from '../algorithms/contracts';
 
 export interface RegisteredLimiter {
   readonly name: string;
-
   readonly scope: string;
-
   readonly runtime: RuntimeLimiterConfig;
-
   readonly execution: RuntimeExecutionPolicy;
-
   readonly resilience: RuntimeResiliencePolicy;
-
   readonly exposure: RuntimeExposurePolicy;
-
   readonly adjustments: RuntimeAdjustmentPolicy;
-
   readonly identity: RuntimeIdentityPolicy;
-
   readonly blocking?: RuntimeBlockingPolicy;
-
   readonly progressiveBlocking?: RuntimeProgressiveBlockingPolicy;
-
   readonly algorithm: LimiterAlgorithm;
 }
 
 @Injectable()
 export class LimiterRegistry {
-  private readonly limiters = new Map<string, RegisteredLimiter>();
-
-  register(entry: RegisteredLimiter): void {
-    if (this.limiters.has(entry.name)) {
-      throw new RateLimiterConfigurationError(`Duplicate limiter "${entry.name}"`);
-    }
-
-    this.limiters.set(entry.name, deepFreeze(entry));
-  }
+  constructor(private readonly limiters: ReadonlyMap<string, RegisteredLimiter>) {}
 
   get(name: string): RegisteredLimiter {
     const limiter = this.limiters.get(name);
@@ -61,6 +42,6 @@ export class LimiterRegistry {
   }
 
   getAll(): ReadonlyMap<string, RegisteredLimiter> {
-    return new Map(this.limiters);
+    return this.limiters;
   }
 }

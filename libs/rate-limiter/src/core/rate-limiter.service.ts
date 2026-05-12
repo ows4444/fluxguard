@@ -16,8 +16,6 @@ import { CircuitBreakerService } from './policy/circuit-breaker.service';
 
 import { DegradedModeService } from './policy/degraded-mode.service';
 
-import { HotKeyShieldService } from './policy/hot-key-shield.service';
-
 import { RATE_LIMITER_OPTIONS } from '../module/rate-limiter.constants';
 
 import type { RateLimiterModuleOptions } from '../module/rate-limiter.interfaces';
@@ -33,6 +31,7 @@ import type { ConsumeResult, PeekResult, RuntimeDecision } from './contracts/res
 import { ResultFactory } from './contracts/result.factory';
 
 import { optionalProp } from './utils/object.utils';
+import { AdmissionControlService } from './policy/admission-control.service';
 
 @Injectable()
 export class RateLimiterService {
@@ -49,7 +48,7 @@ export class RateLimiterService {
 
     private readonly degradedMode: DegradedModeService,
 
-    private readonly hotKeyShield: HotKeyShieldService,
+    private readonly admissionControl: AdmissionControlService,
 
     private readonly scripts: RedisScriptRegistry,
 
@@ -80,26 +79,28 @@ export class RateLimiterService {
     try {
       const result = await registered.algorithm.consume(key, signal);
 
-      const hotness = this.hotKeyShield.record(key);
+      const admissionResult = this.admissionControl.evaluate(key);
 
-      if (this.hotKeyShield.shouldMitigate(hotness)) {
-        if (this.hotKeyShield.probabilisticReject(key)) {
-          return ResultFactory.degradedRejected(key, 1000);
-        }
+      if (admissionResult) {
+        return admissionResult;
       }
 
-      if (hotness >= 5000 && Probabilistic.sample(`${key}:${Math.floor(hotness / 1000)}`, 100)) {
-        this.logger.warn(
-          JSON.stringify({
-            event: 'rate_limiter_hot_key',
+      const hotness = this.admissionControl.hotness(key);
 
-            limiter: limiterName,
+      if (this.admissionControl.shouldLogHotKey(hotness)) {
+        if (Probabilistic.sample(`${key}:${Math.floor(hotness / 1000)}`, 100)) {
+          this.logger.warn(
+            JSON.stringify({
+              event: 'rate_limiter_hot_key',
 
-            hotness,
+              limiter: limiterName,
 
-            keyHash: key.slice(0, 12),
-          }),
-        );
+              hotness,
+
+              keyHash: key.slice(0, 12),
+            }),
+          );
+        }
       }
 
       this.circuitBreaker.recordSuccess(breakerKey);
@@ -306,14 +307,6 @@ export class RateLimiterService {
 
       ...optionalProp('errorCode', exposure.errorCode),
     };
-  }
-
-  private classifyError(err: unknown): string {
-    if (!(err instanceof Error)) {
-      return 'unknown';
-    }
-
-    return RedisErrorClassifier.classify(err).type;
   }
 
   private recordLatency(limiterName: string, durationMs: number): void {

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
-import { REDIS_CLIENT } from '../../module/tokens';
+import { RATE_LIMITER_REDIS } from '../../module/tokens';
 
 import type { RedisClient } from '../../redis/types';
 
@@ -21,7 +21,7 @@ export class HybridClockService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
 
   constructor(
-    @Inject(REDIS_CLIENT)
+    @Inject(RATE_LIMITER_REDIS)
     private readonly redis: RedisClient,
 
     private readonly monotonic: MonotonicClockService,

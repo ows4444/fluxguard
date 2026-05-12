@@ -1,4 +1,4 @@
-import { InjectionToken, ModuleMetadata, OptionalFactoryDependency } from '@nestjs/common';
+import { InjectionToken, ModuleMetadata, OptionalFactoryDependency, Type } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { QuotaAlgorithm, RateLimitKind } from './rate-limiter.types';
@@ -34,8 +34,22 @@ interface BaseRateLimitConfig {
   concurrencyGroup?: string;
   priority?: number;
 }
+
+export interface RateLimiterOptionsFactory {
+  createRateLimiterOptions(): Promise<RateLimiterModuleOptions> | RateLimiterModuleOptions;
+}
+
+export interface RateLimiterModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+  inject?: (InjectionToken | OptionalFactoryDependency)[];
+
+  useExisting?: Type<RateLimiterOptionsFactory>;
+
+  useClass?: Type<RateLimiterOptionsFactory>;
+
+  useFactory?: (...args: any[]) => Promise<RateLimiterModuleOptions> | RateLimiterModuleOptions;
+}
 export interface QuotaRateLimitConfig extends BaseRateLimitConfig {
-  kind?: 'quota';
+  kind: 'quota';
   points: number;
   duration: number;
   algorithm?: QuotaAlgorithm;

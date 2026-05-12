@@ -6,39 +6,53 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/*.d.ts'],
   },
+
   eslint.configs.recommended,
+
   ...tseslint.configs.recommendedTypeChecked,
+
   eslintPluginPrettierRecommended,
+
   {
     languageOptions: {
       globals: {
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: 'commonjs',
+
+      sourceType: 'module',
+
       parserOptions: {
-        projectService: true,
+        project: ['./tsconfig.eslint.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
   },
+
   {
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { argsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/no-unsafe-function-type': 'warn',
-      '@typescript-eslint/unbound-method': 'off',
-      'prettier/prettier': [
+      'no-restricted-imports': [
         'error',
-        { singleQuote: true, trailingComma: 'all', printWidth: 120 },
+        {
+          patterns: ['*/internal/*', '**/dist/**'],
+        },
       ],
+
+      '@typescript-eslint/no-explicit-any': 'warn',
+
+      '@typescript-eslint/no-floating-promises': 'warn',
+
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+
+      '@typescript-eslint/no-unsafe-function-type': 'warn',
+
+      '@typescript-eslint/unbound-method': 'off',
+
+      'prettier/prettier': 'error',
     },
   },
 );

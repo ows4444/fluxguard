@@ -185,7 +185,7 @@ export class RedisScriptRegistry {
     try {
       await this.topologyWarmupPromise;
     } finally {
-      this.topologyWarmupPromise = undefined;
+      delete this.topologyWarmupPromise;
     }
   }
 

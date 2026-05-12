@@ -1,3 +1,5 @@
+import { RateLimiterConfigurationError } from '../errors/rate-limiter.errors';
+
 export class RateLimitIdentity {
   private static readonly MAX_LENGTH = 128;
 
@@ -7,11 +9,11 @@ export class RateLimitIdentity {
     const normalized = value.trim().toLowerCase();
 
     if (normalized.length === 0) {
-      throw new Error('Rate limit override cannot be empty');
+      throw new RateLimiterConfigurationError('Rate limit override cannot be empty');
     }
 
     if (!this.VALUE_PATTERN.test(normalized)) {
-      throw new Error('Rate limit override contains invalid characters');
+      throw new RateLimiterConfigurationError('Rate limit override contains invalid characters');
     }
 
     return normalized.slice(0, this.MAX_LENGTH);
