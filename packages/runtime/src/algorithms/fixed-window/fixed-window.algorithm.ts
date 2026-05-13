@@ -23,6 +23,22 @@ export class FixedWindowAlgorithm implements RuntimeAlgorithm {
   }
 
   async consume(key: string): Promise<AlgorithmConsumeResult> {
+    if ('consumeFixedWindow' in this.#storage) {
+      const result = await this.#storage.consumeFixedWindow(key, this.#limit, this.#durationMs);
+
+      return {
+        allowed: result.allowed,
+
+        reason: result.allowed ? 'ALLOWED' : 'LIMIT_EXCEEDED',
+
+        remaining: result.remaining,
+
+        retryAfter: result.retryAfter,
+
+        resetTime: Date.now() + result.retryAfter,
+      };
+    }
+
     const result = await this.#storage.incrementCounter(key, 1, this.#durationMs);
 
     const allowed = result.value <= this.#limit;
@@ -41,6 +57,22 @@ export class FixedWindowAlgorithm implements RuntimeAlgorithm {
   }
 
   async peek(key: string): Promise<AlgorithmConsumeResult> {
+    if ('peekFixedWindow' in this.#storage) {
+      const result = await this.#storage.peekFixedWindow(key, this.#limit);
+
+      return {
+        allowed: result.remaining > 0,
+
+        reason: result.remaining > 0 ? 'ALLOWED' : 'LIMIT_EXCEEDED',
+
+        remaining: result.remaining,
+
+        retryAfter: result.retryAfter,
+
+        resetTime: Date.now() + result.retryAfter,
+      };
+    }
+
     const current = await this.#storage.getCounter(key);
 
     const totalHits = current?.value ?? 0;

@@ -30,6 +30,18 @@ export class RuntimeDecisionMapper {
   }
 
   toPeekResult(execution: RuntimeExecutionResult): PeekResult {
-    return this.toAdvisoryPeekResult(execution);
+    if (execution.context.definition.descriptor.execution.scopeKind === 'global') {
+      return {
+        ...this.toConsumeResult(execution),
+
+        consistency: 'consistent',
+      };
+    }
+
+    return {
+      ...this.toConsumeResult(execution),
+
+      consistency: 'advisory',
+    };
   }
 }

@@ -18,3 +18,7 @@ export interface RuntimeExecutionResult {
 
   readonly algorithm: AlgorithmConsumeResult;
 }
+
+export interface RuntimeExecutionMetadata {
+  readonly consistent?: boolean;
+}

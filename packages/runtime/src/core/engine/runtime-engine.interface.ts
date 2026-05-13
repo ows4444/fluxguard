@@ -1,4 +1,10 @@
-import type { ConsumeResult, PeekResult, RateLimitConfig, RateLimitContext } from '@fluxguard/contracts';
+import type {
+  ConsumeResult,
+  PeekResult,
+  RateLimitAdjustmentOptions,
+  RateLimitConfig,
+  RateLimitContext,
+} from '@fluxguard/contracts';
 
 import type { RuntimeLimiterDefinition } from './runtime-limiter.definition';
 
@@ -12,4 +18,6 @@ export interface RuntimeEngineContract {
   getDefinition(name: string): RuntimeLimiterDefinition | undefined;
 
   getDefinitions(): readonly RuntimeLimiterDefinition[];
+
+  adjust(limiterName: string, context: RateLimitContext, options: RateLimitAdjustmentOptions): Promise<void>;
 }

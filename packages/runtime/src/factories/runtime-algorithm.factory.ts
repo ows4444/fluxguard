@@ -29,7 +29,9 @@ export class RuntimeAlgorithmFactory {
       case 'burst':
         return new BurstAlgorithm({
           limit: config.limit,
-          durationMs: config.burstWindowMs,
+          sustainedDurationMs: config.sustainedDurationMs,
+          burstCapacity: config.burstCapacity,
+          burstWindowMs: config.burstWindowMs,
           storage,
         });
 

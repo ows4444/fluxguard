@@ -46,6 +46,18 @@ export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
     } catch {
       this.#breaker.failure();
 
+      options.onFailure?.({
+        limiter: context.definition.name,
+
+        key: context.key,
+
+        reason: error instanceof Error ? error.message : 'UNKNOWN',
+
+        timestamp: Date.now(),
+
+        durationMs: Date.now() - context.startedAt,
+      });
+
       const failOpen = this.#policy.shouldAllowOnFailure(context.definition.descriptor.resilience.failBehavior);
 
       if (failOpen) {

@@ -1,5 +1,6 @@
 export * from './core/index';
 export * from './errors/index';
+export * from './events/index';
 export * from './results/index';
 export type {
   BlockingStorageCapability,

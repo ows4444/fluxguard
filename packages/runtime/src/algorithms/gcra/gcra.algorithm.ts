@@ -23,44 +23,42 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
   }
 
   async consume(key: string): Promise<AlgorithmConsumeResult> {
-    const now = Date.now();
-
-    const current = (await this.#storage.getGcraRecord(key)) ?? {
-      theoreticalArrivalTime: now,
-      expiresAt: now,
-    };
-
-    const newTat = Math.max(current.theoreticalArrivalTime, now) + this.#interval;
-
-    const allowAt = newTat - this.#burstCapacity * this.#interval;
-
-    if (allowAt > now) {
-      return {
-        reason: 'LIMIT_EXCEEDED',
-        allowed: false,
-        remaining: 0,
-        retryAfter: allowAt - now,
-        resetTime: allowAt,
-      };
+    if (!('consumeGcra' in this.#storage)) {
+      return this.consumeFallback(key);
     }
 
-    const expiresAt = newTat + this.#burstCapacity * this.#interval;
-
-    await this.#storage.setGcraRecord(key, {
-      theoreticalArrivalTime: newTat,
-      expiresAt,
-    });
+    const result = await this.#storage.consumeGcra(key, this.#interval, this.#burstCapacity);
 
     return {
-      reason: 'ALLOWED',
-      allowed: true,
-      remaining: Math.max(0, Math.floor((this.#burstCapacity * this.#interval - (newTat - now)) / this.#interval)),
-      retryAfter: 0,
-      resetTime: expiresAt,
+      reason: result.allowed ? 'ALLOWED' : 'LIMIT_EXCEEDED',
+
+      allowed: result.allowed,
+
+      remaining: result.remaining,
+
+      retryAfter: result.retryAfter,
+
+      resetTime: Date.now() + result.retryAfter,
     };
   }
 
   async peek(key: string): Promise<AlgorithmConsumeResult> {
+    if ('peekGcra' in this.#storage) {
+      const result = await this.#storage.peekGcra(key, this.#interval, this.#burstCapacity);
+
+      return {
+        reason: result.allowed ? 'ALLOWED' : 'LIMIT_EXCEEDED',
+
+        allowed: result.allowed,
+
+        remaining: result.remaining,
+
+        retryAfter: result.retryAfter,
+
+        resetTime: Date.now() + result.retryAfter,
+      };
+    }
+
     const now = Date.now();
 
     const current = await this.#storage.getGcraRecord(key);
@@ -79,6 +77,7 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
 
     return {
       reason: 'ALLOWED',
+
       allowed: allowAt <= now,
 
       remaining: Math.max(

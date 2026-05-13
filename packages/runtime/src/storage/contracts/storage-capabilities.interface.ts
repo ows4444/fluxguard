@@ -46,3 +46,115 @@ export interface ViolationStorageCapability {
 export interface KeyValueStorageCapability {
   delete(key: string): Promise<void>;
 }
+
+export interface GcraConsumeCapability {
+  consumeGcra(
+    key: string,
+    emissionMs: number,
+    burst: number,
+  ): Promise<{
+    allowed: boolean;
+    retryAfter: number;
+    remaining: number;
+  }>;
+}
+
+export interface FixedWindowConsumeCapability {
+  consumeFixedWindow(
+    key: string,
+    limit: number,
+    durationMs: number,
+  ): Promise<{
+    allowed: boolean;
+    remaining: number;
+    retryAfter: number;
+    current: number;
+  }>;
+}
+
+export interface BlockingConsumeCapability {
+  consumeBlockedFixedWindow(
+    key: string,
+    blockKey: string,
+    limit: number,
+    durationMs: number,
+  ): Promise<{
+    allowed: boolean;
+    remaining: number;
+    retryAfter: number;
+    blocked: boolean;
+  }>;
+}
+
+export interface ProgressiveBlockingCapability {
+  consumeWithProgressiveBlocking(
+    key: string,
+    blockKey: string,
+    violationKey: string,
+    limit: number,
+    durationMs: number,
+    initialBlockSeconds: number,
+    multiplier: number,
+    maxBlockSeconds: number,
+    violationTtlSeconds: number,
+  ): Promise<{
+    allowed: boolean;
+    remaining: number;
+    retryAfter: number;
+    blocked: boolean;
+  }>;
+}
+
+export interface BurstConsumeCapability {
+  consumeBurst(
+    sustainedKey: string,
+    burstKey: string,
+    sustainedLimit: number,
+    sustainedDurationMs: number,
+    burstLimit: number,
+    burstDurationMs: number,
+  ): Promise<{
+    allowed: boolean;
+    remaining: number;
+    retryAfter: number;
+    sustainedCurrent: number;
+    burstCurrent: number;
+  }>;
+}
+
+export interface AdjustmentCapability {
+  adjustFixedWindowIdempotent(
+    limiterKey: string,
+    operationKey: string,
+    delta: number,
+    operationTtlSeconds: number,
+  ): Promise<{ applied: boolean; duplicate: boolean; expired: boolean; value: number }>;
+
+  adjustBurstIdempotent(
+    sustainedKey: string,
+    burstKey: string,
+    operationKey: string,
+    delta: number,
+    operationTtlSeconds: number,
+  ): Promise<{ applied: boolean; duplicate: boolean; expired: boolean; sustained: number; burst: number }>;
+}
+
+export interface RedisTimeCapability {
+  now(): Promise<number>;
+}
+export interface PeekCapability {
+  peekFixedWindow(key: string, limit: number): Promise<{ remaining: number; retryAfter: number; current: number }>;
+
+  peekBurst(
+    sustainedKey: string,
+    burstKey: string,
+    sustainedLimit: number,
+    burstLimit: number,
+  ): Promise<{ remaining: number; retryAfter: number }>;
+
+  peekGcra(
+    key: string,
+    emissionMs: number,
+    burst: number,
+  ): Promise<{ allowed: boolean; retryAfter: number; remaining: number }>;
+}
