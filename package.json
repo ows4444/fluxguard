@@ -5,7 +5,7 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "build": "pnpm build:types && turbo run build",
-    "build:types": "tsc -b",
+    "build:types": "tsc -b tsconfig.build.json",
     "clean:types": "tsc -b --clean",
     "clean": "turbo run clean && pnpm clean:types",
     "clean:full": "turbo run clean && rimraf node_modules",

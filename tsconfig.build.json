@@ -1,4 +1,9 @@
 {
-  "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "files": [],
+
+  "references": [
+    { "path": "./packages/contracts/tsconfig.build.json" },
+    { "path": "./packages/runtime/tsconfig.build.json" },
+    { "path": "./packages/nestjs/tsconfig.build.json" }
+  ]
 }

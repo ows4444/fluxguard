@@ -1,9 +1,9 @@
 import type { Options } from 'tsup';
 
 export const baseConfig: Options = {
-  clean: true,
+  clean: false,
 
-  dts: true,
+  dts: false,
 
   sourcemap: true,
 
