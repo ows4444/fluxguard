@@ -1,11 +1,15 @@
 {
   "compilerOptions": {
+    // "module": "NodeNext",
+    // "moduleResolution": "NodeNext",
+
     "module": "ESNext",
+
     "moduleResolution": "Bundler",
+
     "target": "ES2023",
     "lib": ["ES2023"],
     "strict": true,
-    "strictNullChecks": true,
     "noImplicitReturns": true,
     "noImplicitAny": true,
     "noImplicitOverride": true,
@@ -13,15 +17,18 @@
     "exactOptionalPropertyTypes": true,
     "useUnknownInCatchVariables": true,
     "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "preserveWatchOutput": true,
+    "noErrorTruncation": true,
     "moduleDetection": "force",
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "sourceMap": true
   }
 }

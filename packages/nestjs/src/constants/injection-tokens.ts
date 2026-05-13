@@ -1,0 +1,1 @@
+export const FLUXGUARD_RUNTIME = Symbol('FLUXGUARD_RUNTIME');

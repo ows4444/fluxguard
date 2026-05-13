@@ -1,12 +1,9 @@
 packages:
   - packages/*
   - playground/*
-
 allowBuilds:
-  "@nestjs/core": true
+  '@nestjs/core': false
   esbuild: true
-  sharp: true
-  unrs-resolver: true
 
 onlyBuiltDependencies:
   - esbuild

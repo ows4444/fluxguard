@@ -21,11 +21,13 @@ const INCLUDE_FILENAMES = new Set([
   '.npmrc',
   '.gitkeep',
   '.prettierrc',
+  '.npmignore',
   '.gitignore',
   '.editorconfig',
   // ".dockerignore",
   // ".code-workspace",
   // ".example",
+  'build',
 ]);
 
 const IGNORE_NAMES = new Set([

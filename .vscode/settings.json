@@ -18,5 +18,22 @@
   ],
   "[lua]": {
     "editor.defaultFormatter": "yinfei.luahelper"
+  },
+
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true
+    // "**/node_modules": true,
+    // "**/dist": true,
+    // "**/.turbo": true,
+    // "**/coverage": true,
+    // "**/*.tsbuildinfo": true
+  },
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.turbo": true,
+    "**/coverage": true
   }
 }

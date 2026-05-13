@@ -8,13 +8,5 @@
 
   "files": [],
 
-  "references": [
-    { "path": "./packages/algorithms" },
-    { "path": "./packages/contracts" },
-    { "path": "./packages/core" },
-    { "path": "./packages/memory" },
-    { "path": "./packages/nestjs" },
-    { "path": "./packages/redis" },
-    { "path": "./packages/runtime" }
-  ]
+  "references": [{ "path": "./packages/contracts" }, { "path": "./packages/nestjs" }, { "path": "./packages/runtime" }]
 }

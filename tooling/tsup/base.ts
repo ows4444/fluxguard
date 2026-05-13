@@ -23,6 +23,12 @@ export const baseConfig: Options = {
 
   keepNames: true,
 
+  cjsInterop: true,
+
+  shims: false,
+
+  bundle: true,
+
   outExtension({ format }) {
     return {
       js: format === 'esm' ? '.mjs' : '.cjs',

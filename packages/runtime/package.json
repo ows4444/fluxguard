@@ -4,7 +4,7 @@
   "private": false,
   "type": "module",
   "main": "./dist/index.cjs",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     "./package.json": "./package.json",
     ".": {
@@ -12,31 +12,42 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs",
       "default": "./dist/index.mjs"
-    }
+    },
+    "./*": null
   },
   "files": [
     "dist"
   ],
   "sideEffects": false,
   "dependencies": {
-    "@fluxguard/algorithms": "workspace:*",
-    "@fluxguard/contracts": "workspace:*"
+    "@fluxguard/contracts": "workspace:*",
+    "ioredis": "^5.10.1"
   },
   "scripts": {
-    "build": "tsup",
-    "clean": "rimraf dist",
+    "build": "pnpm typecheck && tsup",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "test": "jest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=20"
   },
   "license": "MIT",
+  "keywords": [
+    "rate-limit",
+    "rate-limiter",
+    "redis",
+    "nestjs",
+    "throttling",
+    "gcra"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/your-org/fluxguard.git"

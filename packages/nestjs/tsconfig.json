@@ -1,21 +1,24 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.types.json",
 
   "compilerOptions": {
     "rootDir": "./src",
 
-    "outDir": "./dist",
+    "outDir": "./dist/types",
 
     "composite": true,
 
     "incremental": true,
 
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "tsBuildInfoFile": "./.tsbuildinfo",
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
 
   "include": ["src"],
 
   "exclude": ["dist", "node_modules"],
 
-  "references": [{ "path": "../core" }, { "path": "../runtime" }]
+  "references": [{ "path": "../runtime" }]
 }

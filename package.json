@@ -4,37 +4,52 @@
   "packageManager": "pnpm@11.0.3",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "build": "turbo run build",
-    "clean": "turbo run clean",
+    "build": "pnpm build:types && turbo run build",
+    "build:types": "tsc -b",
+    "clean:types": "tsc -b --clean",
+    "clean": "turbo run clean && pnpm clean:types",
     "clean:full": "turbo run clean && rimraf node_modules",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "ci": "pnpm check && pnpm build",
     "build:packages": "turbo run build --filter='./packages/*'",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "test:watch": "turbo run test:watch --parallel",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "build:watch": "turbo run build --watch",
+    "combine": "tsx scripts/combine.ts",
+    "un:combine": "tsx scripts/uncombine.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^9.18.0",
-    "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-boundaries": "^6.0.2",
     "eslint-plugin-prettier": "^5.2.2",
+    "eslint-plugin-simple-import-sort": "^13.0.0",
     "globals": "^16.0.0",
-    "jest": "^30.0.0",
     "only-allow": "^1.2.2",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
-    "ts-jest": "^29.2.5",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "turbo": "^2.9.12",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^4.1.6"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=20"

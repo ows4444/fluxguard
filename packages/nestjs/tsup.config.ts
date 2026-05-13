@@ -2,12 +2,10 @@ import { defineConfig } from 'tsup';
 
 import { baseConfig } from '../../tooling/tsup/base';
 
-import { nodeExternals } from '../../tooling/tsup/externals';
-
 export default defineConfig({
   ...baseConfig,
 
   entry: ['src/index.ts'],
 
-  external: nodeExternals,
+  external: ['@nestjs/common', '@nestjs/core', '@nestjs/config', 'reflect-metadata', 'rxjs'],
 });

@@ -1,7 +1,35 @@
-node_modules
-dist
-coverage
-.turbo
-*.tsbuildinfo
+# dependencies
+node_modules/
+
+# builds
+dist/
+build/
+coverage/
+.turbo/
+
+# env
 .env
+.env.*
+
+# logs
+*.log
+
+# ide
+.vscode/
+.idea/
+
+# mac
 .DS_Store
+
+# testing
+coverage/
+
+# cache
+.cache/
+.tmp/
+
+# generated
+generated/
+
+# typescript
+*.tsbuildinfo

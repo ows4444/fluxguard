@@ -1,21 +1,21 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.types.json",
 
   "compilerOptions": {
     "rootDir": "./src",
 
-    "outDir": "./dist",
+    "outDir": "./dist/types",
 
     "composite": true,
 
     "incremental": true,
 
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "tsBuildInfoFile": "./.tsbuildinfo"
   },
 
   "include": ["src"],
 
   "exclude": ["dist", "node_modules"],
 
-  "references": [{ "path": "../contracts" }, { "path": "../algorithms" }]
+  "references": [{ "path": "../contracts" }]
 }

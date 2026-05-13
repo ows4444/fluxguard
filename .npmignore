@@ -2,3 +2,7 @@ src
 tsconfig*
 *.log
 coverage
+.github
+.vscode
+test
+tests
