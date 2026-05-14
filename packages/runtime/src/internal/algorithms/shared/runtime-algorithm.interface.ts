@@ -17,7 +17,7 @@ export interface AlgorithmConsumeResult {
 }
 
 export interface RuntimeAlgorithm {
-  consume(key: string): Promise<AlgorithmConsumeResult>;
+  consume(key: string, now: number): Promise<AlgorithmConsumeResult>;
 
-  peek(key: string): Promise<AlgorithmConsumeResult>;
+  peek(key: string, now: number): Promise<AlgorithmConsumeResult>;
 }

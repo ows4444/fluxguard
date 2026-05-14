@@ -4,7 +4,6 @@ import { RedisClusterKeyFactory } from '../../../adapters/redis/internal/redis-c
 import { allowedResult, blockedResult, rejectedResult } from '../../../results';
 import type { RuntimeStore } from '../../../storage';
 import type { RuntimeExecutionPipeline } from '../../execution/pipeline/runtime-execution-pipeline.interface';
-import { RuntimeTimeoutService } from '../../execution/resilience/runtime-timeout.service';
 import type { RuntimeExecutionContext } from '../../execution/runtime-execution-context';
 
 export interface RuntimeBlockingPipelineOptions {
@@ -17,8 +16,6 @@ export class RuntimeBlockingPipeline implements RuntimeExecutionPipeline {
   readonly #store: RuntimeStore;
 
   readonly #pipeline: RuntimeExecutionPipeline;
-
-  readonly #timeout = new RuntimeTimeoutService();
 
   constructor(options: RuntimeBlockingPipelineOptions) {
     this.#store = options.store;
@@ -42,20 +39,16 @@ export class RuntimeBlockingPipeline implements RuntimeExecutionPipeline {
       return this.#pipeline.consume(context);
     }
 
-    const result = await this.#timeout.execute(
-      () =>
-        this.#store.consumeWithProgressiveBlocking(
-          context.key,
-          RedisClusterKeyFactory.scoped(context.key, 'block'),
-          RedisClusterKeyFactory.scoped(context.key, 'violations'),
-          runtime.limit,
-          runtime.durationMs,
-          progressive.initialBlockSeconds,
-          progressive.multiplier,
-          progressive.maxBlockSeconds,
-          progressive.violationTtlSeconds,
-        ),
-      context.definition.descriptor.execution.timeoutMs,
+    const result = await this.#store.consumeWithProgressiveBlocking(
+      context.key,
+      RedisClusterKeyFactory.scoped(context.key, 'block'),
+      RedisClusterKeyFactory.scoped(context.key, 'violations'),
+      runtime.limit,
+      runtime.durationMs,
+      progressive.initialBlockSeconds,
+      progressive.multiplier,
+      progressive.maxBlockSeconds,
+      progressive.violationTtlSeconds,
     );
 
     if (result.blocked) {

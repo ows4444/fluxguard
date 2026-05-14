@@ -7,9 +7,19 @@ export interface RuntimeStoreCapabilities {
 
   readonly progressiveBlocking: boolean;
 
-  readonly adjustments: boolean;
-
-  readonly peek: boolean;
-
   readonly distributedTime: boolean;
+
+  readonly adjustments: {
+    readonly fixedWindow: boolean;
+
+    readonly burst: boolean;
+  };
+
+  readonly peek: {
+    readonly fixedWindow: boolean;
+
+    readonly burst: boolean;
+
+    readonly gcra: boolean;
+  };
 }

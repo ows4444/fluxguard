@@ -45,9 +45,19 @@ export class RedisRuntimeStore implements RuntimeStore {
 
       progressiveBlocking: true,
 
-      adjustments: true,
+      adjustments: {
+        fixedWindow: true,
 
-      peek: true,
+        burst: true,
+      },
+
+      peek: {
+        fixedWindow: true,
+
+        burst: true,
+
+        gcra: true,
+      },
 
       distributedTime: true,
     };

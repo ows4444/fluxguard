@@ -3,7 +3,7 @@ import type { ConsumeResult, PeekResult } from '@fluxguard/contracts';
 import type { RuntimeEventBus } from '../../events';
 import type { RuntimeExecutionContext, RuntimeExecutionPipeline } from '../../internal/execution';
 import { isBlocked, isDegraded } from '../../results';
-import type { RuntimeClock } from '../../time';
+import type { RuntimeClock, RuntimeMonotonicClock } from '../../time';
 import type { RuntimeConsumeRequest, RuntimeExecutor, RuntimePeekRequest } from './runtime-executor.interface';
 
 export interface DefaultRuntimeExecutorOptions {
@@ -12,6 +12,8 @@ export interface DefaultRuntimeExecutorOptions {
   readonly events: RuntimeEventBus;
 
   readonly clock: RuntimeClock;
+
+  readonly monotonicClock: RuntimeMonotonicClock;
 }
 
 export class DefaultRuntimeExecutor implements RuntimeExecutor {
@@ -20,23 +22,26 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
   readonly #clock: RuntimeClock;
 
+  readonly #monotonicClock: RuntimeMonotonicClock;
+
   constructor(options: DefaultRuntimeExecutorOptions) {
     this.#pipeline = options.pipeline;
     this.#events = options.events;
     this.#clock = options.clock;
+    this.#monotonicClock = options.monotonicClock;
   }
 
   async consume(request: RuntimeConsumeRequest): Promise<ConsumeResult> {
     const context = await this.createExecutionContext(request);
 
-    const started = performance.now();
+    const started = this.#monotonicClock.now();
 
-    const startedAt = Date.now();
+    const startedAt = await this.#clock.now();
 
     try {
       const result = await this.#pipeline.consume(context);
 
-      const durationMs = performance.now() - started;
+      const durationMs = this.#monotonicClock.now() - started;
 
       this.#events.emitDecision({
         limiter: request.definition.name,
@@ -129,7 +134,7 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
   async peek(request: RuntimePeekRequest): Promise<PeekResult> {
     const context = await this.createExecutionContext(request);
 
-    const started = performance.now();
+    const started = this.#monotonicClock.now();
 
     const startedAt = Date.now();
 

@@ -1,20 +1,25 @@
 import type { ConsumeResult, PeekResult, RuntimeFailureEvent } from '@fluxguard/contracts';
 
 import { RuntimeInfrastructureError } from '../../../errors';
-import type { RuntimeHealthMonitor } from '../../state';
+import type { RuntimeStoreHealthMonitor } from '../../state';
 import type { RuntimeExecutionPipeline } from '../pipeline/runtime-execution-pipeline.interface';
 import type { RuntimeExecutionContext } from '../runtime-execution-context';
+import { RuntimeExecutionAbortedError } from './runtime-aborted.error';
 import { RuntimeCircuitBreakerOpenError } from './runtime-circuit-breaker.error';
-import { RuntimeCircuitBreakerService } from './runtime-circuit-breaker.service';
-import { RuntimeDegradationService } from './runtime-degradation.service';
 import { RuntimeFailPolicyService } from './runtime-fail-policy.service';
-import { RuntimeLatencyMonitor } from './runtime-latency.monitor';
+import type { RuntimeResilienceState } from './runtime-resilience.state';
 import { RuntimeTimeoutError, RuntimeTimeoutService } from './runtime-timeout.service';
 
 export interface RuntimeResiliencePipelineOptions {
   readonly pipeline: RuntimeExecutionPipeline;
 
-  readonly health: RuntimeHealthMonitor;
+  readonly health: RuntimeStoreHealthMonitor;
+
+  readonly state: RuntimeResilienceState;
+
+  readonly monotonicNow: () => number;
+
+  readonly wallClockNow: () => number;
 
   readonly onFailure?: (event: RuntimeFailureEvent) => void;
 }
@@ -22,66 +27,67 @@ export interface RuntimeResiliencePipelineOptions {
 export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
   readonly #pipeline: RuntimeExecutionPipeline;
 
-  readonly #health: RuntimeHealthMonitor;
+  readonly #health: RuntimeStoreHealthMonitor;
 
   readonly #onFailure: ((event: RuntimeFailureEvent) => void) | undefined;
 
   readonly #timeout = new RuntimeTimeoutService();
 
-  readonly #degradation = new RuntimeDegradationService();
-
   readonly #policy = new RuntimeFailPolicyService();
 
-  readonly #breaker = new RuntimeCircuitBreakerService({
-    failureThreshold: 5,
-    recoveryTimeMs: 10_000,
-  });
+  readonly #monotonicNow: () => number;
 
-  readonly #latency = new RuntimeLatencyMonitor({
-    sampleSize: 100,
+  readonly #wallClockNow: () => number;
 
-    degradedThresholdMs: 250,
-
-    openThresholdMs: 1000,
-  });
+  readonly #state: RuntimeResilienceState;
 
   constructor(options: RuntimeResiliencePipelineOptions) {
     this.#pipeline = options.pipeline;
 
     this.#health = options.health;
 
+    this.#state = options.state;
+
+    this.#monotonicNow = options.monotonicNow;
+
+    this.#wallClockNow = options.wallClockNow;
+
     this.#onFailure = options.onFailure;
   }
 
   async consume(context: RuntimeExecutionContext): Promise<ConsumeResult> {
-    const started = performance.now();
+    const started = this.#monotonicNow();
 
     try {
-      if (!this.#breaker.canExecute()) {
+      if (!this.#state.breaker.canExecute()) {
         throw new RuntimeCircuitBreakerOpenError();
       }
 
-      if (this.#latency.shouldOpen()) {
-        throw new RuntimeCircuitBreakerOpenError();
-      }
+      const result = await this.#timeout.execute(async ({ signal, timedOut }) => {
+        const response = await this.#pipeline.consume({
+          ...context,
+          signal,
+        });
 
-      const result = await this.#timeout.execute(
-        () => this.#pipeline.consume(context),
-        context.definition.descriptor.execution.timeoutMs,
-      );
+        if (timedOut()) {
+          throw new RuntimeTimeoutError(context.definition.descriptor.execution.timeoutMs);
+        }
 
-      this.#latency.record(performance.now() - started);
+        return response;
+      }, context.definition.descriptor.execution.timeoutMs);
 
-      this.#breaker.success();
+      this.#state.latency.record(this.#monotonicNow() - started);
+
+      this.#state.breaker.success();
 
       return result;
     } catch (error) {
-      const durationMs = performance.now() - started;
+      const durationMs = this.#monotonicNow() - started;
 
-      this.#latency.record(durationMs);
+      this.#state.latency.record(durationMs);
 
-      if (this.isInfrastructureFailure(error)) {
-        this.#breaker.failure();
+      if (!(error instanceof RuntimeExecutionAbortedError) && this.isInfrastructureFailure(error)) {
+        this.#state.breaker.failure();
       }
 
       this.#onFailure?.({
@@ -91,9 +97,9 @@ export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
 
         reason: error instanceof Error ? error.message : 'UNKNOWN',
 
-        timestamp: Date.now(),
+        timestamp: this.#wallClockNow(),
 
-        durationMs: Date.now() - context.startedAt,
+        durationMs,
       });
 
       const failOpen = this.#policy.shouldAllowOnFailure(context.definition.descriptor.resilience.failBehavior);
@@ -101,19 +107,13 @@ export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
       if (failOpen) {
         const allowance = context.definition.descriptor.resilience.degradedAllowancePerSecond;
 
-        const allowed = this.#degradation.shouldAllow(context.definition.name, context.key, allowance);
+        const allowed = this.#state.degradation.shouldAllow(context.definition.name, context.key, allowance);
 
         if (!allowed) {
-          return this.#degradation.createRejectedResult(context.key);
+          return this.#state.degradation.createRejectedResult(context.key);
         }
 
-        return this.#degradation.createAllowedResult(context.key);
-      }
-
-      if (this.#breaker.isOpen()) {
-        this.#health.markOpen('CIRCUIT_BREAKER_OPEN');
-      } else {
-        this.#health.markDegraded(error instanceof Error ? error.message : 'RUNTIME_FAILURE');
+        return this.#state.degradation.createAllowedResult(context.key);
       }
 
       throw new RuntimeInfrastructureError(`Limiter execution failed: ${context.definition.name}`, {

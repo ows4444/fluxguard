@@ -26,6 +26,8 @@ export class RuntimeLuaExecutor {
       return (await this.#redis.evalsha(sha, keys.length, ...keys, ...args.map(String))) as TResult;
     } catch (error) {
       if (error instanceof Error && error.message.includes('NOSCRIPT')) {
+        this.#loader.invalidate(definition.name);
+
         const reloadedSha = await this.#loader.load(definition.name, definition.script);
 
         return (await this.#redis.evalsha(reloadedSha, keys.length, ...keys, ...args.map(String))) as TResult;

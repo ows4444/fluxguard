@@ -16,15 +16,23 @@ import { buildRuntimeKey } from '../../core/identity/key-builder';
 import { RuntimeExecutionError } from '../../errors';
 import { RuntimeEventBus } from '../../events';
 import type { RuntimeStore } from '../../storage/contracts';
-import { RedisRuntimeClock, type RuntimeClock, SystemRuntimeClock } from '../../time';
+import {
+  RedisRuntimeClock,
+  type RuntimeClock,
+  type RuntimeMonotonicClock,
+  SystemMonotonicClock,
+  SystemRuntimeClock,
+} from '../../time';
 import { RuntimeBlockingPipeline } from '../blocking';
 import { RuntimeDefinitionCompiler } from '../compiler';
 import { DefaultRuntimeExecutionPipeline, RuntimeResiliencePipeline } from '../execution';
+import { RuntimeResilienceState } from '../execution/resilience/runtime-resilience.state';
 import { RuntimeAlgorithmFactory } from '../factories';
 import { DefaultRuntimeOrchestrator } from '../orchestration';
 import { RuntimePlanExecutor } from '../orchestration/runtime-plan.executor';
 import { RuntimeRegistry } from '../registry/runtime-registry';
-import { RuntimeHealthMonitor } from '../state';
+import { RuntimeStoreHealthMonitor } from '../state';
+import { RuntimeEngineDestroyedError } from './runtime-engine.errors';
 
 export interface RuntimeEngineOptions {
   readonly storage: RuntimeStore;
@@ -33,6 +41,10 @@ export interface RuntimeEngineOptions {
 }
 
 export class RuntimeEngine implements RuntimeEngineContract {
+  readonly #shutdown = new AbortController();
+
+  #destroyed = false;
+
   readonly #registry: RuntimeRegistry;
 
   readonly #compiler: RuntimeDefinitionCompiler;
@@ -41,6 +53,8 @@ export class RuntimeEngine implements RuntimeEngineContract {
 
   readonly #events: RuntimeEventBus;
   readonly #storage: RuntimeStore;
+
+  readonly #resilienceStates = new Map<string, RuntimeResilienceState>();
 
   readonly #adjustments: RuntimeAdjustmentService;
 
@@ -52,9 +66,11 @@ export class RuntimeEngine implements RuntimeEngineContract {
 
   readonly #planExecutor: RuntimePlanExecutor;
 
-  readonly #health: RuntimeHealthMonitor;
+  readonly #health: RuntimeStoreHealthMonitor;
 
   readonly #clock: RuntimeClock;
+
+  readonly #monotonicClock: RuntimeMonotonicClock;
 
   constructor(options: RuntimeEngineOptions) {
     this.#storage = options.storage;
@@ -62,6 +78,8 @@ export class RuntimeEngine implements RuntimeEngineContract {
 
     this.#clock =
       typeof this.#storage.now === 'function' ? new RedisRuntimeClock(this.#storage) : new SystemRuntimeClock();
+
+    this.#monotonicClock = new SystemMonotonicClock();
 
     this.#adjustments = new RuntimeAdjustmentService({
       storage: this.#storage,
@@ -73,22 +91,30 @@ export class RuntimeEngine implements RuntimeEngineContract {
 
     this.#algorithmFactory = new RuntimeAlgorithmFactory();
 
-    this.#health = new RuntimeHealthMonitor({
+    this.#health = new RuntimeStoreHealthMonitor({
       storage: this.#storage,
       events: this.#events,
     });
 
     this.#orchestrator = new DefaultRuntimeOrchestrator(this.#registry, {
       consume: async (request) => {
+        this.ensureActive();
         const executor = this.getExecutor(request.definition.name);
 
-        return executor.consume(request);
+        return executor.consume({
+          ...request,
+          signal: this.composeSignal(request.signal),
+        });
       },
 
       peek: async (request) => {
+        this.ensureActive();
         const executor = this.getExecutor(request.definition.name);
 
-        return executor.peek(request);
+        return executor.peek({
+          ...request,
+          signal: this.composeSignal(request.signal),
+        });
       },
     });
     this.#planExecutor = new RuntimePlanExecutor({
@@ -123,7 +149,7 @@ export class RuntimeEngine implements RuntimeEngineContract {
   register(name: string, config: RateLimitConfig): RuntimeLimiterDefinition {
     const definition = this.#compiler.compile(name, config);
 
-    const executor = this.createExecutor(definition.compiled.runtime);
+    const executor = this.createExecutor(definition.name, definition.compiled.runtime);
 
     this.#registry.register(definition);
 
@@ -186,8 +212,12 @@ export class RuntimeEngine implements RuntimeEngineContract {
     return this.#registry.getAll();
   }
 
-  private createExecutor(config: RuntimeLimiterConfig): RuntimeExecutor {
+  private createExecutor(limiterName: string, config: RuntimeLimiterConfig): RuntimeExecutor {
     const algorithm = this.#algorithmFactory.create(config, this.#storage);
+
+    const resilienceState = new RuntimeResilienceState();
+
+    this.#resilienceStates.set(limiterName, resilienceState);
 
     const executionPipeline = new DefaultRuntimeExecutionPipeline({
       algorithm,
@@ -197,6 +227,12 @@ export class RuntimeEngine implements RuntimeEngineContract {
       pipeline: executionPipeline,
 
       health: this.#health,
+
+      state: resilienceState,
+
+      monotonicNow: () => this.#monotonicClock.now(),
+
+      wallClockNow: () => Date.now(),
 
       onFailure: (event) => {
         this.#events.emitFailure(event);
@@ -215,7 +251,47 @@ export class RuntimeEngine implements RuntimeEngineContract {
       events: this.#events,
 
       clock: this.#clock,
+
+      monotonicClock: this.#monotonicClock,
     });
+  }
+
+  getLimiterState(limiterName: string): {
+    readonly degraded: boolean;
+    readonly open: boolean;
+  } | null {
+    const state = this.#resilienceStates.get(limiterName);
+
+    if (!state) {
+      return null;
+    }
+
+    return {
+      degraded: state.isDegraded(),
+      open: state.isOpen(),
+    };
+  }
+
+  async destroy(): Promise<void> {
+    if (this.#destroyed) {
+      return;
+    }
+
+    this.#destroyed = true;
+    this.#shutdown.abort(new RuntimeEngineDestroyedError());
+
+    for (const state of this.#resilienceStates.values()) {
+      state.destroy();
+    }
+
+    this.#resilienceStates.clear();
+    this.#executors.clear();
+  }
+
+  private ensureActive(): void {
+    if (this.#destroyed) {
+      throw new RuntimeEngineDestroyedError();
+    }
   }
 
   private getExecutor(name: string): RuntimeExecutor {
@@ -226,5 +302,13 @@ export class RuntimeEngine implements RuntimeEngineContract {
     }
 
     return executor;
+  }
+
+  private composeSignal(signal?: AbortSignal): AbortSignal {
+    if (!signal) {
+      return this.#shutdown.signal;
+    }
+
+    return AbortSignal.any([signal, this.#shutdown.signal]);
   }
 }

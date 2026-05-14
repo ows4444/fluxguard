@@ -17,7 +17,7 @@ export class CooldownAlgorithm implements RuntimeAlgorithm {
     this.#storage = options.storage;
   }
 
-  async consume(key: string): Promise<AlgorithmConsumeResult> {
+  async consume(key: string, now: number): Promise<AlgorithmConsumeResult> {
     const existing = await this.#storage.getCooldown(key);
 
     if (existing) {
@@ -25,7 +25,7 @@ export class CooldownAlgorithm implements RuntimeAlgorithm {
         reason: 'LIMIT_EXCEEDED',
         allowed: false,
         remaining: 0,
-        retryAfter: Math.max(0, existing.expiresAt - Date.now()),
+        retryAfter: Math.max(0, existing.expiresAt - now),
       };
     }
 
@@ -39,7 +39,7 @@ export class CooldownAlgorithm implements RuntimeAlgorithm {
     };
   }
 
-  async peek(key: string): Promise<AlgorithmConsumeResult> {
+  async peek(key: string, now: number): Promise<AlgorithmConsumeResult> {
     const existing = await this.#storage.getCooldown(key);
 
     if (!existing) {
@@ -50,7 +50,7 @@ export class CooldownAlgorithm implements RuntimeAlgorithm {
       reason: 'LIMIT_EXCEEDED',
       allowed: false,
       remaining: 0,
-      retryAfter: Math.max(0, existing.expiresAt - Date.now()),
+      retryAfter: Math.max(0, existing.expiresAt - now),
     };
   }
 }

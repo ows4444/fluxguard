@@ -31,9 +31,19 @@ export class InMemoryRateLimitStore implements RuntimeStore {
 
       progressiveBlocking: false,
 
-      adjustments: false,
+      adjustments: {
+        fixedWindow: false,
 
-      peek: true,
+        burst: false,
+      },
+
+      peek: {
+        fixedWindow: true,
+
+        burst: false,
+
+        gcra: false,
+      },
 
       distributedTime: false,
     };
@@ -197,42 +207,44 @@ export class InMemoryRateLimitStore implements RuntimeStore {
     remaining: number;
     retryAfter: number;
   }> {
-    const now = Date.now();
+    return this.#locks.execute(key, async () => {
+      const now = Date.now();
 
-    const current = await this.getGcraRecord(key);
+      const current = await this.getGcraRecord(key);
 
-    const tat = current?.theoreticalArrivalTime ?? now;
+      const tat = current?.theoreticalArrivalTime ?? now;
 
-    const allowedAt = tat - (burst - 1) * emissionMs;
+      const allowedAt = tat - (burst - 1) * emissionMs;
 
-    if (now < allowedAt) {
+      if (now < allowedAt) {
+        return {
+          allowed: false,
+          retryAfter: allowedAt - now,
+          remaining: 0,
+        };
+      }
+
+      const newTat = Math.max(now, tat) + emissionMs;
+
+      const expiresAt = newTat + burst * emissionMs;
+
+      await this.setGcraRecord(key, {
+        theoreticalArrivalTime: newTat,
+        expiresAt,
+      });
+
+      const virtualStart = newTat - burst * emissionMs;
+
+      const distance = now - virtualStart;
+
+      const remaining = Math.max(0, Math.min(burst - 1, Math.floor(distance / emissionMs)));
+
       return {
-        allowed: false,
-        retryAfter: allowedAt - now,
-        remaining: 0,
+        allowed: true,
+        retryAfter: 0,
+        remaining,
       };
-    }
-
-    const newTat = Math.max(now, tat) + emissionMs;
-
-    const expiresAt = newTat + burst * emissionMs;
-
-    await this.setGcraRecord(key, {
-      theoreticalArrivalTime: newTat,
-      expiresAt,
     });
-
-    const virtualStart = newTat - burst * emissionMs;
-
-    const distance = now - virtualStart;
-
-    const remaining = Math.max(0, Math.min(burst - 1, Math.floor(distance / emissionMs)));
-
-    return {
-      allowed: true,
-      retryAfter: 0,
-      remaining,
-    };
   }
 
   async getGcraRecord(key: string): Promise<GcraRecord | null> {

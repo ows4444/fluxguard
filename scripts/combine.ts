@@ -3,31 +3,31 @@ import path from 'path';
 
 const ROOT_DIR = process.cwd();
 const OUTPUT_PREFIX = 'combine-part';
-const MAX_CHARS = 150_000;
+const MAX_CHARS = 160_000;
 
 const INCLUDE_EXTENSIONS = new Set([
   '.ts',
-  '.mjs',
-  '.json',
-  '.md',
-  '.yml',
-  '.yaml',
-  '.lua', //
+  // '.mjs',
+  // '.json',
+  // '.md',
+  // '.yml',
+  // '.yaml',
+  // '.lua', //
 ]);
 
 const INCLUDE_FILENAMES = new Set([
   // "Dockerfile",
   // "Makefile",
-  '.npmrc',
-  '.gitkeep',
-  '.prettierrc',
-  '.npmignore',
-  '.gitignore',
-  '.editorconfig',
+  // '.npmrc',
+  // '.gitkeep',
+  // '.prettierrc',
+  // '.npmignore',
+  // '.gitignore',
+  // '.editorconfig',
   // ".dockerignore",
   // ".code-workspace",
   // ".example",
-  'build',
+  // 'build',
 ]);
 
 const IGNORE_NAMES = new Set([
@@ -42,8 +42,9 @@ const IGNORE_NAMES = new Set([
 
 const IGNORE_PATH_PREFIXES = [
   'libs', //
-  // 'tooling', //
+  'tooling', //
   'test', //
+  'packages/nestjs', //
   // 'packages', //
   'playground', //
   'scripts',

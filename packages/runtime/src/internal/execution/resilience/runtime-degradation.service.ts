@@ -1,6 +1,7 @@
 import type { ConsumeResult } from '@fluxguard/contracts';
 
 import { degradedAllowedResult, degradedRejectedResult } from '../../../results';
+import { RuntimeExpiringMap } from '../../shared/runtime-expiring-map';
 
 interface Bucket {
   tokens: number;
@@ -11,17 +12,19 @@ interface Bucket {
 }
 
 export class RuntimeDegradationService {
-  readonly #buckets = new Map<string, Bucket>();
+  readonly #buckets = new RuntimeExpiringMap<Bucket>({
+    maxSize: 10_000,
+  });
 
   static readonly BUCKET_TTL_MS = 60_000;
 
   static readonly CLEANUP_INTERVAL = 1000;
 
-  #operations = 0;
+  destroy(): void {
+    this.#buckets.destroy();
+  }
 
   shouldAllow(limiter: string, key: string, allowancePerSecond: number): boolean {
-    this.cleanupExpiredBuckets();
-
     if (allowancePerSecond <= 0) {
       return false;
     }
@@ -45,7 +48,7 @@ export class RuntimeDegradationService {
     existing.lastRefill = now;
 
     if (existing.tokens < 1) {
-      this.#buckets.set(bucketKey, existing);
+      this.#buckets.set(bucketKey, existing, existing.expiresAt);
 
       return false;
     }
@@ -54,25 +57,9 @@ export class RuntimeDegradationService {
 
     existing.expiresAt = now + RuntimeDegradationService.BUCKET_TTL_MS;
 
-    this.#buckets.set(bucketKey, existing);
+    this.#buckets.set(bucketKey, existing, existing.expiresAt);
 
     return true;
-  }
-
-  private cleanupExpiredBuckets(): void {
-    this.#operations += 1;
-
-    if (this.#operations % RuntimeDegradationService.CLEANUP_INTERVAL !== 0) {
-      return;
-    }
-
-    const now = Date.now();
-
-    for (const [key, bucket] of this.#buckets.entries()) {
-      if (bucket.expiresAt <= now) {
-        this.#buckets.delete(key);
-      }
-    }
   }
 
   createAllowedResult(key: string): ConsumeResult {

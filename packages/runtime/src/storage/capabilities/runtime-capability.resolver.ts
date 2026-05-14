@@ -15,9 +15,19 @@ export class RuntimeCapabilityResolver {
 
       progressiveBlocking: 'consumeWithProgressiveBlocking' in store,
 
-      adjustments: 'adjustFixedWindowIdempotent' in store && 'adjustBurstIdempotent' in store,
+      adjustments: {
+        fixedWindow: 'adjustFixedWindowIdempotent' in store,
 
-      peek: 'peekFixedWindow' in store,
+        burst: 'adjustBurstIdempotent' in store,
+      },
+
+      peek: {
+        fixedWindow: 'peekFixedWindow' in store,
+
+        burst: 'peekBurst' in store,
+
+        gcra: 'peekGcra' in store,
+      },
 
       distributedTime: 'now' in store,
     };

@@ -37,7 +37,7 @@ export class BurstAlgorithm implements RuntimeAlgorithm {
     this.#storage = options.storage;
   }
 
-  async consume(key: string): Promise<AlgorithmConsumeResult> {
+  async consume(key: string, _now: number): Promise<AlgorithmConsumeResult> {
     const result = await this.#storage.consumeBurst(
       RedisClusterKeyFactory.scoped(key, 'sustained'),
       RedisClusterKeyFactory.scoped(key, 'burst'),
@@ -62,7 +62,7 @@ export class BurstAlgorithm implements RuntimeAlgorithm {
     };
   }
 
-  async peek(key: string): Promise<AlgorithmConsumeResult> {
+  async peek(key: string, _now: number): Promise<AlgorithmConsumeResult> {
     if (!this.#storage.peekBurst) {
       throw new Error('Burst peek unsupported');
     }

@@ -1,3 +1,5 @@
+import { RuntimeExpiringMap } from '../shared/runtime-expiring-map';
+
 interface HotKeyEntry {
   hits: number;
 
@@ -24,9 +26,9 @@ export class RuntimeHotKeyDetector {
 
   readonly #suppressionMs: number;
 
-  readonly #entries = new Map<string, HotKeyEntry>();
-
-  #operations = 0;
+  readonly #entries = new RuntimeExpiringMap<HotKeyEntry>({
+    maxSize: 100_000,
+  });
 
   constructor(options: RuntimeHotKeyDetectorOptions) {
     this.#threshold = options.threshold;
@@ -37,7 +39,6 @@ export class RuntimeHotKeyDetector {
   }
 
   register(key: string): void {
-    this.cleanupExpiredEntries();
     const now = Date.now();
 
     const existing = this.#entries.get(key);
@@ -47,11 +48,17 @@ export class RuntimeHotKeyDetector {
     }
 
     if (!existing || existing.expiresAt <= now) {
-      this.#entries.set(key, {
-        hits: 1,
-        expiresAt: Math.max(now + this.#windowMs, now + RuntimeHotKeyDetector.ENTRY_TTL_MS),
-        suppressedUntil: 0,
-      });
+      const expiresAt = Math.max(now + this.#windowMs, now + RuntimeHotKeyDetector.ENTRY_TTL_MS);
+
+      this.#entries.set(
+        key,
+        {
+          hits: 1,
+          expiresAt,
+          suppressedUntil: 0,
+        },
+        expiresAt,
+      );
 
       return;
     }
@@ -67,21 +74,5 @@ export class RuntimeHotKeyDetector {
     }
 
     return;
-  }
-
-  private cleanupExpiredEntries(): void {
-    this.#operations += 1;
-
-    if (this.#operations % RuntimeHotKeyDetector.CLEANUP_INTERVAL !== 0) {
-      return;
-    }
-
-    const now = Date.now();
-
-    for (const [key, entry] of this.#entries.entries()) {
-      if (entry.expiresAt <= now && entry.suppressedUntil <= now) {
-        this.#entries.delete(key);
-      }
-    }
   }
 }

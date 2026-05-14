@@ -33,3 +33,6 @@ generated/
 
 # typescript
 *.tsbuildinfo
+
+
+*.diff

@@ -2,20 +2,20 @@ import type { RuntimeEventBus } from '../../events';
 import type { RuntimeStore } from '../../storage';
 import { RuntimeStateMachine } from './runtime-state.machine';
 
-export interface RuntimeHealthMonitorOptions {
+export interface RuntimeStoreHealthMonitorOptions {
   readonly storage: RuntimeStore;
 
   readonly events: RuntimeEventBus;
 }
 
-export class RuntimeHealthMonitor {
+export class RuntimeStoreHealthMonitor {
   readonly #storage: RuntimeStore;
 
   readonly #events: RuntimeEventBus;
 
   readonly #machine = new RuntimeStateMachine();
 
-  constructor(options: RuntimeHealthMonitorOptions) {
+  constructor(options: RuntimeStoreHealthMonitorOptions) {
     this.#storage = options.storage;
 
     this.#events = options.events;
@@ -23,6 +23,10 @@ export class RuntimeHealthMonitor {
 
   get state() {
     return this.#machine.current;
+  }
+
+  isOpen(): boolean {
+    return this.#machine.isTerminalOpen();
   }
 
   async check(): Promise<void> {
@@ -57,17 +61,5 @@ export class RuntimeHealthMonitor {
     }
 
     this.#machine.transition('ACTIVE', 'STORE_HEALTHY');
-  }
-
-  markDegraded(reason: string): void {
-    this.#machine.transition('DEGRADED', reason);
-  }
-
-  markOpen(reason: string): void {
-    this.#machine.transition('OPEN', reason);
-  }
-
-  markHealthy(): void {
-    this.#machine.transition('ACTIVE', 'RUNTIME_HEALTHY');
   }
 }

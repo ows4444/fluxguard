@@ -39,4 +39,11 @@ export interface RuntimeEngineContract {
   checkHealth(): Promise<void>;
 
   getRuntimeState(): LimiterRuntimeState;
+
+  getLimiterState(limiterName: string): {
+    readonly degraded: boolean;
+    readonly open: boolean;
+  } | null;
+
+  destroy(): Promise<void>;
 }

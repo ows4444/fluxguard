@@ -14,6 +14,8 @@ export interface RuntimeExecutionContext {
   readonly startedAt: number;
 
   readonly clock: RuntimeClock;
+
+  readonly signal?: AbortSignal;
 }
 
 export interface RuntimeExecutionResult {

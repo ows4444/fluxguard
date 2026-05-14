@@ -20,6 +20,10 @@ export class RuntimeStateMachine {
     return this.#state;
   }
 
+  isTerminalOpen(): boolean {
+    return this.#state.state === 'OPEN';
+  }
+
   transition(state: LimiterState, reason: string): RuntimeStateTransition | null {
     if (this.#state.state === state) {
       return null;

@@ -9,6 +9,10 @@ export class RuntimeLuaScriptLoader {
     this.#redis = redis;
   }
 
+  invalidate(name: string): void {
+    this.#cache.delete(name);
+  }
+
   async load(name: string, script: string): Promise<string> {
     const existing = this.#cache.get(name);
 
@@ -21,6 +25,7 @@ export class RuntimeLuaScriptLoader {
       .then((sha) => sha as string)
       .catch((error) => {
         this.#cache.delete(name);
+
         throw error;
       });
 

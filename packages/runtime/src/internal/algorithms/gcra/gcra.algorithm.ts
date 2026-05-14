@@ -22,11 +22,11 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
     this.#storage = options.storage;
   }
 
-  async consume(key: string): Promise<AlgorithmConsumeResult> {
+  async consume(key: string, now: number): Promise<AlgorithmConsumeResult> {
     const consume = this.#storage.consumeGcra;
 
     if (!consume) {
-      return this.consumeFallback(key);
+      return this.consumeFallback(key, now);
     }
 
     const result = await consume(key, this.#interval, this.#burstCapacity);
@@ -42,9 +42,7 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
     };
   }
 
-  private async consumeFallback(key: string): Promise<AlgorithmConsumeResult> {
-    const now = Date.now();
-
+  private async consumeFallback(key: string, now: number): Promise<AlgorithmConsumeResult> {
     const current = await this.#storage.getGcraRecord(key);
 
     if (!current) {
@@ -93,7 +91,7 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
     };
   }
 
-  async peek(key: string): Promise<AlgorithmConsumeResult> {
+  async peek(key: string, now: number): Promise<AlgorithmConsumeResult> {
     if (this.#storage.peekGcra) {
       const result = await this.#storage.peekGcra(key, this.#interval, this.#burstCapacity);
 
@@ -107,8 +105,6 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
         retryAfter: result.retryAfter,
       };
     }
-
-    const now = Date.now();
 
     const current = await this.#storage.getGcraRecord(key);
 

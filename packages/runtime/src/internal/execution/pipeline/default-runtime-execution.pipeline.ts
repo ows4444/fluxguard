@@ -2,6 +2,7 @@ import type { ConsumeResult, PeekResult } from '@fluxguard/contracts';
 
 import type { RuntimeAlgorithm } from '../../algorithms/index';
 import { RuntimeDecisionMapper } from '../mappers/runtime-decision.mapper';
+import { throwIfAborted } from '../resilience/runtime-abort.utils';
 import type { RuntimeExecutionContext, RuntimeExecutionResult } from '../runtime-execution-context';
 import type { RuntimeExecutionPipeline } from './runtime-execution-pipeline.interface';
 
@@ -21,7 +22,11 @@ export class DefaultRuntimeExecutionPipeline implements RuntimeExecutionPipeline
   }
 
   async consume(context: RuntimeExecutionContext): Promise<ConsumeResult> {
-    const algorithm = await this.#algorithm.consume(context.key);
+    throwIfAborted(context.signal);
+
+    const algorithm = await this.#algorithm.consume(context.key, context.startedAt);
+
+    throwIfAborted(context.signal);
 
     const execution: RuntimeExecutionResult = {
       context,
@@ -32,7 +37,9 @@ export class DefaultRuntimeExecutionPipeline implements RuntimeExecutionPipeline
   }
 
   async peek(context: RuntimeExecutionContext): Promise<PeekResult> {
-    const algorithm = await this.#algorithm.peek(context.key);
+    throwIfAborted(context.signal);
+    const algorithm = await this.#algorithm.peek(context.key, context.startedAt);
+    throwIfAborted(context.signal);
 
     const execution: RuntimeExecutionResult = {
       context,
