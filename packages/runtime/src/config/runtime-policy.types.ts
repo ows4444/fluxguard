@@ -1,24 +1,24 @@
 import type { FailBehavior, RateLimitKind } from '@fluxguard/contracts';
 
 export interface RuntimeExecutionPolicy {
-  readonly enabled: boolean;
-  readonly priority: number;
-  readonly timeoutMs: number;
   readonly concurrencyGroup?: string;
-  readonly scopeKind: 'global' | 'route';
+  readonly enabled: boolean;
   readonly limiterKind: RateLimitKind;
+  readonly priority: number;
+  readonly scopeKind: 'global' | 'route';
+  readonly timeoutMs: number;
 }
 
 export interface RuntimeResiliencePolicy {
   readonly critical: boolean;
-  readonly failBehavior?: FailBehavior;
   readonly degradedAllowancePerSecond: number;
+  readonly failBehavior?: FailBehavior;
 }
 
 export interface RuntimeExposurePolicy {
+  readonly errorCode?: string;
   readonly exposeInHeaders: boolean;
   readonly message?: string | ((retryAfter: number) => string);
-  readonly errorCode?: string;
 }
 
 export interface RuntimeAdjustmentPolicy {
@@ -26,22 +26,22 @@ export interface RuntimeAdjustmentPolicy {
 }
 
 export interface RuntimeIdentityPolicy {
-  readonly keySegments: readonly ('ip' | 'userId' | 'deviceId')[];
-  readonly ignoreKeyOverride: boolean;
   readonly allowKeyOverride: boolean;
+  readonly ignoreKeyOverride: boolean;
+  readonly keySegments: readonly ('ip' | 'userId' | 'deviceId')[];
 }
 
 export interface RuntimeBlockingPolicy {
   readonly blockDurationSeconds: number;
-  readonly multiplier: number;
   readonly maxBlockDurationSeconds: number;
+  readonly multiplier: number;
 }
 
 export interface RuntimeProgressiveBlockingPolicy {
   readonly enabled: boolean;
   readonly initialBlockSeconds: number;
-  readonly multiplier: number;
   readonly maxBlockSeconds: number;
+  readonly multiplier: number;
   readonly violationTtlSeconds: number;
 }
 export interface RuntimeMetadataPolicy {

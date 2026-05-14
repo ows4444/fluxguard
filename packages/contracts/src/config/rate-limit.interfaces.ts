@@ -3,75 +3,77 @@ import type { QuotaAlgorithm } from './rate-limit.types';
 export type FailBehavior = 'open' | 'closed';
 
 export interface BurstConfig {
-  burstPoints: number;
-  burstDuration: number;
+  readonly burstDuration: number;
+  readonly burstPoints: number;
 }
 
 export interface ProgressiveBlockingConfig {
   enabled?: boolean;
   initialBlockSeconds: number;
-  multiplier: number;
   maxBlockSeconds: number;
+  multiplier: number;
   violationTtlSeconds: number;
 }
 
 interface BaseRateLimitConfig {
-  degradedAllowancePerSecond?: number;
-  allowManualAdjustments?: boolean;
   allowKeyOverride?: boolean;
-  critical?: boolean;
-  enabled?: boolean;
-  failBehavior?: FailBehavior;
-  message?: string | ((retryAfter: number) => string);
-  errorCode?: string;
-  keySegments?: Array<'ip' | 'userId' | 'deviceId'>;
-  ignoreKeyOverride?: boolean;
-  exposeInHeaders?: boolean;
-  executionTimeoutMs?: number;
+  allowManualAdjustments?: boolean;
   concurrencyGroup?: string;
+  critical?: boolean;
+  degradedAllowancePerSecond?: number;
+  enabled?: boolean;
+  errorCode?: string;
+  executionTimeoutMs?: number;
+  exposeInHeaders?: boolean;
+  failBehavior?: FailBehavior;
+  ignoreKeyOverride?: boolean;
+  keySegments?: Array<'ip' | 'userId' | 'deviceId'>;
+  message?: string | ((retryAfter: number) => string);
   priority?: number;
 }
 
 export interface QuotaRateLimitConfig extends BaseRateLimitConfig {
   kind: 'quota';
-  points: number;
   duration: number;
+  points: number;
+
   algorithm?: QuotaAlgorithm;
-  burst?: BurstConfig;
   blockDuration?: number;
   blockMultiplier?: number;
+  burst?: BurstConfig;
   progressiveBlocking?: ProgressiveBlockingConfig;
 }
 
 export interface GlobalRateLimitConfig extends BaseRateLimitConfig {
   kind: 'global';
-  points: number;
   duration: number;
+  points: number;
 
   algorithm?: never;
-  burst?: never;
   blockDuration?: never;
   blockMultiplier?: never;
+  burst?: never;
 }
 
 export interface CooldownRateLimitConfig extends BaseRateLimitConfig {
   kind: 'cooldown';
   duration: number;
 
-  points?: never;
   algorithm?: never;
-  burst?: never;
+  allowManualAdjustments?: never;
   blockDuration?: never;
   blockMultiplier?: never;
-  allowManualAdjustments?: never;
+  burst?: never;
+  points?: never;
 }
 
 export type RateLimitConfig = QuotaRateLimitConfig | GlobalRateLimitConfig | CooldownRateLimitConfig;
 
 export interface RateLimitAdjustmentOptions {
-  operationId?: string;
   key: string;
+
+  operationId?: string;
   amount?: number;
-  reason?: string;
   metadata?: Record<string, unknown>;
+  reason?: string;
 }

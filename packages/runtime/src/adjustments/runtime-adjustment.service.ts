@@ -1,14 +1,14 @@
 import type { RateLimitAdjustmentOptions } from '@fluxguard/contracts';
 
 import type { RuntimeLimiterDefinition } from '../core';
-import type { AdjustmentCapability } from '../storage/contracts/storage-capabilities.interface';
+import type { RuntimeStore } from '../storage/contracts/runtime-store.interface';
 
 export interface RuntimeAdjustmentServiceOptions {
-  readonly storage: AdjustmentCapability;
+  readonly storage: RuntimeStore;
 }
 
 export class RuntimeAdjustmentService {
-  readonly #storage: AdjustmentCapability;
+  readonly #storage: RuntimeStore;
 
   constructor(options: RuntimeAdjustmentServiceOptions) {
     this.#storage = options.storage;
@@ -22,6 +22,10 @@ export class RuntimeAdjustmentService {
     const runtime = definition.compiled.runtime;
 
     if (runtime.algorithm === 'burst') {
+      if (!this.#storage.adjustBurstIdempotent) {
+        throw new Error('Burst adjustments unsupported');
+      }
+
       await this.#storage.adjustBurstIdempotent(
         `${key}:sustained`,
         `${key}:burst`,
@@ -34,6 +38,10 @@ export class RuntimeAdjustmentService {
     }
 
     if (runtime.algorithm === 'fixed') {
+      if (!this.#storage.adjustFixedWindowIdempotent) {
+        throw new Error('Fixed-window adjustments unsupported');
+      }
+
       await this.#storage.adjustFixedWindowIdempotent(key, operationKey, options.amount ?? 1, 60);
     }
   }

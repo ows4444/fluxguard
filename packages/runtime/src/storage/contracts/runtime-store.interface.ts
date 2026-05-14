@@ -1,3 +1,4 @@
+import type { RuntimeStoreCapabilities } from './runtime-store.capabilities';
 import type { RuntimeHealthCapability } from './runtime-store.health';
 import type {
   AdjustmentCapability,
@@ -25,11 +26,30 @@ export interface RuntimeStore
     BlockingStorageCapability,
     ViolationStorageCapability,
     KeyValueStorageCapability,
-    RuntimeHealthCapability,
-    GcraConsumeCapability,
-    FixedWindowConsumeCapability,
-    ProgressiveBlockingCapability,
-    BurstConsumeCapability,
-    AdjustmentCapability,
-    RedisTimeCapability,
-    PeekCapability {}
+    RuntimeHealthCapability {
+  initialize?(): Promise<void>;
+
+  consumeGcra?: GcraConsumeCapability['consumeGcra'];
+
+  consumeFixedWindow?: FixedWindowConsumeCapability['consumeFixedWindow'];
+
+  consumeWithProgressiveBlocking?: ProgressiveBlockingCapability['consumeWithProgressiveBlocking'];
+
+  consumeBurst?: BurstConsumeCapability['consumeBurst'];
+
+  adjustFixedWindowIdempotent?: AdjustmentCapability['adjustFixedWindowIdempotent'];
+
+  adjustBurstIdempotent?: AdjustmentCapability['adjustBurstIdempotent'];
+
+  now?: RedisTimeCapability['now'];
+
+  peekFixedWindow?: PeekCapability['peekFixedWindow'];
+
+  peekBurst?: PeekCapability['peekBurst'];
+
+  peekGcra?: PeekCapability['peekGcra'];
+}
+
+export interface RuntimeCapableStore {
+  capabilities(): RuntimeStoreCapabilities;
+}

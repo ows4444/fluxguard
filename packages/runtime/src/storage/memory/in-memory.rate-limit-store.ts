@@ -1,3 +1,4 @@
+import type { RuntimeStoreCapabilities } from '../contracts';
 import type { RuntimeStore } from '../contracts/runtime-store.interface';
 import type {
   BlockRecord,
@@ -7,6 +8,7 @@ import type {
   TokenBucketRecord,
   ViolationRecord,
 } from '../contracts/storage-record.types';
+import { MemoryLockManager } from './internal/memory-lock.manager';
 
 interface Entry<T> {
   value: T;
@@ -16,6 +18,62 @@ interface Entry<T> {
 
 export class InMemoryRateLimitStore implements RuntimeStore {
   readonly #store = new Map<string, Entry<unknown>>();
+
+  readonly #locks = new MemoryLockManager();
+
+  capabilities(): RuntimeStoreCapabilities {
+    return {
+      atomicFixedWindow: true,
+
+      gcra: true,
+
+      burst: false,
+
+      progressiveBlocking: false,
+
+      adjustments: false,
+
+      peek: true,
+
+      distributedTime: false,
+    };
+  }
+
+  async consumeFixedWindow(
+    key: string,
+    limit: number,
+    durationMs: number,
+  ): Promise<{ allowed: boolean; current: number; remaining: number; retryAfter: number }> {
+    const current = await this.incrementCounter(key, 1, durationMs);
+
+    const allowed = current.value <= limit;
+
+    return {
+      allowed,
+      current: current.value,
+      remaining: Math.max(0, limit - current.value),
+      retryAfter: allowed ? 0 : current.expiresAt - Date.now(),
+    };
+  }
+
+  async now(): Promise<number> {
+    return Date.now();
+  }
+
+  async peekFixedWindow(
+    key: string,
+    limit: number,
+  ): Promise<{ current: number; remaining: number; retryAfter: number }> {
+    const current = await this.getCounter(key);
+
+    const value = current?.value ?? 0;
+
+    return {
+      current: value,
+      remaining: Math.max(0, limit - value),
+      retryAfter: current ? Math.max(0, current.expiresAt - Date.now()) : 0,
+    };
+  }
 
   async setBlock(key: string, durationMs: number, reason?: string): Promise<BlockRecord> {
     const record: BlockRecord = {
@@ -83,32 +141,34 @@ export class InMemoryRateLimitStore implements RuntimeStore {
   }
 
   async incrementCounter(key: string, incrementBy: number, durationMs: number): Promise<CounterRecord> {
-    const now = Date.now();
+    return this.#locks.execute(key, async () => {
+      const now = Date.now();
 
-    const existing = this.#store.get(key) as Entry<CounterRecord> | undefined;
+      const existing = this.#store.get(key) as Entry<CounterRecord> | undefined;
 
-    if (!existing || existing.expiresAt <= now) {
-      const record: CounterRecord = {
-        value: incrementBy,
-        expiresAt: now + durationMs,
+      if (!existing || existing.expiresAt <= now) {
+        const record: CounterRecord = {
+          value: incrementBy,
+          expiresAt: now + durationMs,
+        };
+
+        this.#store.set(key, {
+          value: record,
+          expiresAt: record.expiresAt,
+        });
+
+        return record;
+      }
+
+      const updated: CounterRecord = {
+        value: existing.value.value + incrementBy,
+        expiresAt: existing.expiresAt,
       };
 
-      this.#store.set(key, {
-        value: record,
-        expiresAt: record.expiresAt,
-      });
+      existing.value = updated;
 
-      return record;
-    }
-
-    const updated: CounterRecord = {
-      value: existing.value.value + incrementBy,
-      expiresAt: existing.expiresAt,
-    };
-
-    existing.value = updated;
-
-    return updated;
+      return updated;
+    });
   }
 
   async getCounter(key: string): Promise<CounterRecord | null> {
@@ -134,8 +194,8 @@ export class InMemoryRateLimitStore implements RuntimeStore {
     burst: number,
   ): Promise<{
     allowed: boolean;
-    retryAfter: number;
     remaining: number;
+    retryAfter: number;
   }> {
     const now = Date.now();
 

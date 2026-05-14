@@ -1,21 +1,21 @@
 export interface FixedWindowRuntimeConfig {
   readonly algorithm: 'fixed';
-  readonly limit: number;
   readonly durationMs: number;
+  readonly limit: number;
 }
 
 export interface GcraRuntimeConfig {
   readonly algorithm: 'gcra';
-  readonly emissionIntervalMs: number;
   readonly burstCapacity: number;
+  readonly emissionIntervalMs: number;
 }
 
 export interface BurstRuntimeConfig {
   readonly algorithm: 'burst';
-  readonly limit: number;
-  readonly sustainedDurationMs: number;
   readonly burstCapacity: number;
   readonly burstWindowMs: number;
+  readonly limit: number;
+  readonly sustainedDurationMs: number;
 }
 
 export interface CooldownRuntimeConfig {

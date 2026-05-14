@@ -18,6 +18,8 @@ export interface RuntimeDecisionEvent {
 
   readonly degraded: boolean;
 
+  readonly open?: boolean;
+
   readonly blocked: boolean;
 
   readonly timestamp: number;

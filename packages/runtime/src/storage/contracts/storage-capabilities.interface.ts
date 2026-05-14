@@ -1,5 +1,7 @@
 import type {
   BlockRecord,
+  BurstConsumeResult,
+  BurstPeekResult,
   CooldownRecord,
   CounterRecord,
   GcraRecord,
@@ -54,8 +56,31 @@ export interface GcraConsumeCapability {
     burst: number,
   ): Promise<{
     allowed: boolean;
-    retryAfter: number;
     remaining: number;
+    retryAfter: number;
+  }>;
+}
+
+export interface FixedWindowPeekCapability {
+  peekFixedWindow(
+    key: string,
+    limit: number,
+  ): Promise<{
+    current: number;
+    remaining: number;
+    retryAfter: number;
+  }>;
+}
+
+export interface GcraPeekCapability {
+  peekGcra(
+    key: string,
+    emissionMs: number,
+    burst: number,
+  ): Promise<{
+    allowed: boolean;
+    remaining: number;
+    retryAfter: number;
   }>;
 }
 
@@ -66,9 +91,9 @@ export interface FixedWindowConsumeCapability {
     durationMs: number,
   ): Promise<{
     allowed: boolean;
+    current: number;
     remaining: number;
     retryAfter: number;
-    current: number;
   }>;
 }
 
@@ -80,9 +105,9 @@ export interface BlockingConsumeCapability {
     durationMs: number,
   ): Promise<{
     allowed: boolean;
+    blocked: boolean;
     remaining: number;
     retryAfter: number;
-    blocked: boolean;
   }>;
 }
 
@@ -99,9 +124,9 @@ export interface ProgressiveBlockingCapability {
     violationTtlSeconds: number,
   ): Promise<{
     allowed: boolean;
+    blocked: boolean;
     remaining: number;
     retryAfter: number;
-    blocked: boolean;
   }>;
 }
 
@@ -113,13 +138,16 @@ export interface BurstConsumeCapability {
     sustainedDurationMs: number,
     burstLimit: number,
     burstDurationMs: number,
-  ): Promise<{
-    allowed: boolean;
-    remaining: number;
-    retryAfter: number;
-    sustainedCurrent: number;
-    burstCurrent: number;
-  }>;
+  ): Promise<BurstConsumeResult>;
+}
+
+export interface BurstPeekCapability {
+  peekBurst(
+    sustainedKey: string,
+    burstKey: string,
+    sustainedLimit: number,
+    burstLimit: number,
+  ): Promise<BurstPeekResult>;
 }
 
 export interface AdjustmentCapability {
@@ -136,25 +164,10 @@ export interface AdjustmentCapability {
     operationKey: string,
     delta: number,
     operationTtlSeconds: number,
-  ): Promise<{ applied: boolean; duplicate: boolean; expired: boolean; sustained: number; burst: number }>;
+  ): Promise<{ applied: boolean; burst: number; duplicate: boolean; expired: boolean; sustained: number }>;
 }
 
 export interface RedisTimeCapability {
   now(): Promise<number>;
 }
-export interface PeekCapability {
-  peekFixedWindow(key: string, limit: number): Promise<{ remaining: number; retryAfter: number; current: number }>;
-
-  peekBurst(
-    sustainedKey: string,
-    burstKey: string,
-    sustainedLimit: number,
-    burstLimit: number,
-  ): Promise<{ remaining: number; retryAfter: number }>;
-
-  peekGcra(
-    key: string,
-    emissionMs: number,
-    burst: number,
-  ): Promise<{ allowed: boolean; retryAfter: number; remaining: number }>;
-}
+export interface PeekCapability extends FixedWindowPeekCapability, BurstPeekCapability, GcraPeekCapability {}

@@ -29,3 +29,11 @@ export class RuntimeConfigurationError extends Error {
     super(message, options);
   }
 }
+
+export class RuntimeInfrastructureError extends Error {
+  override readonly name = 'RuntimeInfrastructureError';
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+  }
+}

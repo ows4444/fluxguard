@@ -1,6 +1,25 @@
 {
   "editor.formatOnSave": true,
+
   "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+
+  "eslint.useFlatConfig": true,
+
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+
   "cSpell.words": [
     "CLUSTERDOWN",
     "cooldown",
@@ -16,18 +35,19 @@
     "unzipper",
     "ZREMRANGEBYSCORE"
   ],
+
   "[lua]": {
     "editor.defaultFormatter": "yinfei.luahelper"
   },
 
   "files.exclude": {
     "**/.git": true,
-    "**/.DS_Store": true
-    // "**/node_modules": true,
-    // "**/dist": true,
-    // "**/.turbo": true,
-    // "**/coverage": true,
-    // "**/*.tsbuildinfo": true
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.turbo": true,
+    "**/coverage": true,
+    "**/*.tsbuildinfo": true
   },
 
   "search.exclude": {

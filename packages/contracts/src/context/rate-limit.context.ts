@@ -1,7 +1,8 @@
 export interface RateLimitContext {
-  ip?: string;
-  userId?: string;
-  deviceId?: string;
-  keyOverride?: string;
-  [extra: string]: string | undefined;
+  readonly deviceId?: string;
+  readonly userId?: string;
+  readonly ip?: string;
+  readonly keyOverride?: string;
 }
+
+export type RuntimeContextAttributes = Record<string, string | undefined>;

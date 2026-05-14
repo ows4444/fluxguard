@@ -37,3 +37,21 @@ export interface ViolationRecord {
 
   readonly expiresAt: number;
 }
+
+export interface BurstConsumeResult {
+  readonly allowed: boolean;
+
+  readonly burstCurrent: number;
+
+  readonly remaining: number;
+
+  readonly retryAfter: number;
+
+  readonly sustainedCurrent: number;
+}
+
+export interface BurstPeekResult {
+  readonly remaining: number;
+
+  readonly retryAfter: number;
+}

@@ -3,6 +3,7 @@ import boundaries from 'eslint-plugin-boundaries';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import perfectionist from 'eslint-plugin-perfectionist';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -60,10 +61,79 @@ export default tseslint.config(
   {
     plugins: {
       boundaries,
+      perfectionist,
       'simple-import-sort': simpleImportSort,
     },
 
     rules: {
+      'perfectionist/sort-interfaces': [
+        'error',
+        {
+          type: 'alphabetical',
+          order: 'asc',
+          partitionByNewLine: true,
+
+          groups: ['id', 'property', 'method', 'multiline-property'],
+
+          customGroups: [
+            {
+              groupName: 'id',
+              elementNamePattern: '^(id|.*Id|.*ID|key|kind)$',
+            },
+          ],
+        },
+      ],
+
+      'perfectionist/sort-object-types': [
+        'error',
+        {
+          type: 'alphabetical',
+          order: 'asc',
+          partitionByNewLine: true,
+
+          groups: ['id', 'property', 'method', 'multiline-property'],
+
+          customGroups: [
+            {
+              groupName: 'id',
+              elementNamePattern: '^(id|.*Id|.*ID|key|kind)$',
+            },
+          ],
+        },
+      ],
+
+      'perfectionist/sort-classes': [
+        'error',
+        {
+          type: 'alphabetical',
+          order: 'asc',
+          partitionByNewLine: true,
+
+          groups: [
+            'index-signature',
+
+            ['static-property', 'static-accessor-property'],
+
+            ['protected-static-property'],
+            ['private-static-property'],
+
+            ['protected-property', 'protected-accessor-property'],
+            ['private-property', 'private-accessor-property'],
+            ['property', 'accessor-property'],
+
+            'constructor',
+
+            ['static-method', 'static-get-method', 'static-set-method'],
+
+            ['protected-method', 'protected-get-method', 'protected-set-method'],
+
+            ['private-method', 'private-get-method', 'private-set-method'],
+
+            ['method', 'get-method', 'set-method'],
+          ],
+        },
+      ],
+
       'boundaries/element-types': [
         'error',
         {
