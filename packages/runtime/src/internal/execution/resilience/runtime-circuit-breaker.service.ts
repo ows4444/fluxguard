@@ -2,12 +2,16 @@ export interface RuntimeCircuitBreakerOptions {
   readonly failureThreshold: number;
 
   readonly recoveryTimeMs: number;
+
+  readonly now: () => number;
 }
 
 export class RuntimeCircuitBreakerService {
   readonly #failureThreshold: number;
 
   readonly #recoveryTimeMs: number;
+
+  readonly #now: () => number;
 
   #failures = 0;
 
@@ -16,6 +20,8 @@ export class RuntimeCircuitBreakerService {
   constructor(options: RuntimeCircuitBreakerOptions) {
     this.#failureThreshold = options.failureThreshold;
     this.#recoveryTimeMs = options.recoveryTimeMs;
+
+    this.#now = options.now;
   }
 
   canExecute(): boolean {
@@ -23,7 +29,7 @@ export class RuntimeCircuitBreakerService {
       return true;
     }
 
-    const elapsed = Date.now() - this.#openedAt;
+    const elapsed = this.#now() - this.#openedAt;
 
     if (elapsed >= this.#recoveryTimeMs) {
       this.#openedAt = null;
@@ -44,7 +50,7 @@ export class RuntimeCircuitBreakerService {
     this.#failures += 1;
 
     if (this.#failures >= this.#failureThreshold) {
-      this.#openedAt = Date.now();
+      this.#openedAt = this.#now();
     }
   }
 

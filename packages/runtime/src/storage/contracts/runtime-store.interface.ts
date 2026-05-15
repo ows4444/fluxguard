@@ -29,6 +29,8 @@ export interface RuntimeStore
     RuntimeHealthCapability {
   initialize?(): Promise<void>;
 
+  destroy?(): void | Promise<void>;
+
   consumeGcra?: GcraConsumeCapability['consumeGcra'];
 
   consumeFixedWindow?: FixedWindowConsumeCapability['consumeFixedWindow'];

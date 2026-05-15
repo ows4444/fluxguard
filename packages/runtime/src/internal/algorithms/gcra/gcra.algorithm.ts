@@ -22,14 +22,14 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
     this.#storage = options.storage;
   }
 
-  async consume(key: string, now: number): Promise<AlgorithmConsumeResult> {
+  async consume(key: string, now: number, signal?: AbortSignal): Promise<AlgorithmConsumeResult> {
     const consume = this.#storage.consumeGcra;
 
     if (!consume) {
       return this.consumeFallback(key, now);
     }
 
-    const result = await consume(key, this.#interval, this.#burstCapacity);
+    const result = await consume(key, this.#interval, this.#burstCapacity, signal);
 
     return {
       reason: result.allowed ? 'ALLOWED' : 'LIMIT_EXCEEDED',
@@ -91,9 +91,9 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
     };
   }
 
-  async peek(key: string, now: number): Promise<AlgorithmConsumeResult> {
+  async peek(key: string, now: number, signal?: AbortSignal): Promise<AlgorithmConsumeResult> {
     if (this.#storage.peekGcra) {
-      const result = await this.#storage.peekGcra(key, this.#interval, this.#burstCapacity);
+      const result = await this.#storage.peekGcra(key, this.#interval, this.#burstCapacity, signal);
 
       return {
         reason: result.allowed ? 'ALLOWED' : 'LIMIT_EXCEEDED',
@@ -117,7 +117,7 @@ export class GcraAlgorithm implements RuntimeAlgorithm {
       };
     }
 
-    const allowAt = current.theoreticalArrivalTime - this.#burstCapacity * this.#interval;
+    const allowAt = current.theoreticalArrivalTime - (this.#burstCapacity - 1) * this.#interval;
 
     return {
       reason: 'ALLOWED',

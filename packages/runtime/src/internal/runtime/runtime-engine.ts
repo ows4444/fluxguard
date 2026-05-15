@@ -159,6 +159,16 @@ export class RuntimeEngine implements RuntimeEngineContract {
   }
 
   registerPlan(name: string, limiters: readonly string[]): void {
+    if (limiters.length === 0) {
+      throw new RuntimeExecutionError(`Execution plan "${name}" cannot be empty`);
+    }
+
+    const unique = new Set(limiters);
+
+    if (unique.size !== limiters.length) {
+      throw new RuntimeExecutionError(`Execution plan "${name}" contains duplicate limiters`);
+    }
+
     const resolved = limiters.map((limiter) => this.#registry.getOrThrow(limiter));
 
     this.#executionPlans.set(name, resolved);
@@ -215,7 +225,7 @@ export class RuntimeEngine implements RuntimeEngineContract {
   private createExecutor(limiterName: string, config: RuntimeLimiterConfig): RuntimeExecutor {
     const algorithm = this.#algorithmFactory.create(config, this.#storage);
 
-    const resilienceState = new RuntimeResilienceState();
+    const resilienceState = new RuntimeResilienceState(() => this.#monotonicClock.now());
 
     this.#resilienceStates.set(limiterName, resilienceState);
 
@@ -285,7 +295,10 @@ export class RuntimeEngine implements RuntimeEngineContract {
     }
 
     this.#resilienceStates.clear();
+    this.#planExecutor.destroy();
     this.#executors.clear();
+
+    await this.#storage.destroy?.();
   }
 
   private ensureActive(): void {

@@ -82,12 +82,14 @@ export class RedisRuntimeStore implements RuntimeStore {
   async peekFixedWindow(
     key: string,
     limit: number,
+    _durationMs?: number,
+    signal?: AbortSignal,
   ): Promise<{
     current: number;
     remaining: number;
     retryAfter: number;
   }> {
-    const [remaining, retryAfter, current] = await this.#lua.execute(fixedWindowPeekScript, [key], [limit]);
+    const [remaining, retryAfter, current] = await this.#lua.execute(fixedWindowPeekScript, [key], [limit], signal);
 
     return {
       remaining,
@@ -100,12 +102,18 @@ export class RedisRuntimeStore implements RuntimeStore {
     key: string,
     emissionMs: number,
     burst: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     remaining: number;
     retryAfter: number;
   }> {
-    const [allowed, retryAfter, remaining] = await this.#lua.execute(gcraPeekScript, [key], [emissionMs, burst]);
+    const [allowed, retryAfter, remaining] = await this.#lua.execute(
+      gcraPeekScript,
+      [key],
+      [emissionMs, burst],
+      signal,
+    );
 
     return {
       allowed: allowed === 1,
@@ -119,6 +127,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     burstKey: string,
     sustainedLimit: number,
     burstLimit: number,
+    signal?: AbortSignal,
   ): Promise<{
     remaining: number;
     retryAfter: number;
@@ -127,6 +136,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       burstPeekScript,
       [sustainedKey, burstKey],
       [sustainedLimit, burstLimit],
+      signal,
     );
 
     return {
@@ -141,6 +151,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     operationKey: string,
     delta: number,
     operationTtlSeconds: number,
+    signal?: AbortSignal,
   ): Promise<{
     applied: boolean;
     burst: number;
@@ -152,6 +163,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       burstAdjustIdempotentScript,
       [sustainedKey, burstKey, operationKey],
       [delta, operationTtlSeconds],
+      signal,
     );
 
     if (sustained === 'duplicate') {
@@ -188,6 +200,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     operationKey: string,
     delta: number,
     operationTtlSeconds: number,
+    signal?: AbortSignal,
   ): Promise<{
     applied: boolean;
     duplicate: boolean;
@@ -198,6 +211,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       fixedWindowAdjustIdempotentScript,
       [limiterKey, operationKey],
       [delta, operationTtlSeconds],
+      signal,
     );
 
     if (result === 'duplicate') {
@@ -287,6 +301,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     multiplier: number,
     maxBlockSeconds: number,
     violationTtlSeconds: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     blocked: boolean;
@@ -297,6 +312,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       fixedWindowProgressiveBlockingScript,
       [key, blockKey, violationKey],
       [limit, durationMs, initialBlockSeconds, multiplier, maxBlockSeconds, violationTtlSeconds],
+      signal,
     );
 
     return {
@@ -320,6 +336,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     sustainedDurationMs: number,
     burstLimit: number,
     burstDurationMs: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     burstCurrent: number;
@@ -331,6 +348,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       burstConsumeScript,
       [sustainedKey, burstKey],
       [sustainedLimit, sustainedDurationMs, burstLimit, burstDurationMs],
+      signal,
     );
 
     return {
@@ -346,12 +364,18 @@ export class RedisRuntimeStore implements RuntimeStore {
     key: string,
     emissionMs: number,
     burst: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     remaining: number;
     retryAfter: number;
   }> {
-    const [allowed, retryAfter, remaining] = await this.#lua.execute(gcraConsumeScript, [key], [emissionMs, burst]);
+    const [allowed, retryAfter, remaining] = await this.#lua.execute(
+      gcraConsumeScript,
+      [key],
+      [emissionMs, burst],
+      signal,
+    );
 
     return {
       allowed: allowed === 1,
@@ -364,6 +388,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     key: string,
     limit: number,
     durationMs: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     current: number;
@@ -374,6 +399,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       fixedWindowAtomicConsumeScript,
       [key],
       [limit, durationMs],
+      signal,
     );
 
     return {
@@ -391,7 +417,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       return null;
     }
 
-    return JSON.parse(raw) as GcraRecord;
+    return this.#safeParseRecord<GcraRecord>(key, raw);
   }
 
   async setCooldown(key: string, durationMs: number): Promise<CooldownRecord> {
@@ -412,7 +438,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       return null;
     }
 
-    return JSON.parse(raw) as CooldownRecord;
+    return this.#safeParseRecord<CooldownRecord>(key, raw);
   }
   async setTokenBucket(key: string, record: TokenBucketRecord): Promise<void> {
     const ttl = Math.max(1, record.expiresAt - Date.now());
@@ -426,8 +452,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     if (!raw) {
       return null;
     }
-
-    return JSON.parse(raw) as TokenBucketRecord;
+    return this.#safeParseRecord<TokenBucketRecord>(key, raw);
   }
 
   async setBlock(key: string, durationMs: number, reason?: string): Promise<BlockRecord> {
@@ -449,7 +474,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       return null;
     }
 
-    return JSON.parse(raw) as BlockRecord;
+    return this.#safeParseRecord<BlockRecord>(key, raw);
   }
 
   async consumeBlockedFixedWindow(
@@ -457,6 +482,7 @@ export class RedisRuntimeStore implements RuntimeStore {
     blockKey: string,
     limit: number,
     durationMs: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     blocked: boolean;
@@ -467,6 +493,7 @@ export class RedisRuntimeStore implements RuntimeStore {
       fixedWindowBlockingConsumeScript,
       [key, blockKey],
       [limit, durationMs],
+      signal,
     );
 
     return {
@@ -508,5 +535,15 @@ export class RedisRuntimeStore implements RuntimeStore {
 
   async delete(key: string): Promise<void> {
     await this.#client.del(key);
+  }
+
+  async #safeParseRecord<T>(key: string, raw: string): Promise<T | null> {
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      await this.#client.del(key);
+
+      return null;
+    }
   }
 }

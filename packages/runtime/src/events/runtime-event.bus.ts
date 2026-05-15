@@ -28,23 +28,23 @@ export class RuntimeEventBus {
   }
 
   emitDecision(event: RuntimeDecisionEvent): void {
-    this.#emitter.emit('decision', event);
+    this.#safeEmit('decision', event);
   }
 
   emitFailure(event: RuntimeFailureEvent): void {
-    this.#emitter.emit('failure', event);
+    this.#safeEmit('failure', event);
   }
 
   emitHealth(event: RuntimeStoreHealthEvent): void {
-    this.#emitter.emit('health', event);
+    this.#safeEmit('health', event);
   }
 
   emitMetrics(event: RuntimeExecutionMetricsEvent): void {
-    this.#emitter.emit('metrics', event);
+    this.#safeEmit('metrics', event);
   }
 
   emitTracing(event: RuntimeTracingEvent): void {
-    this.#emitter.emit('tracing', event);
+    this.#safeEmit('tracing', event);
   }
 
   onDecision(listener: (event: RuntimeDecisionEvent) => void): () => void {
@@ -85,5 +85,16 @@ export class RuntimeEventBus {
     return () => {
       this.#emitter.off('tracing', listener);
     };
+  }
+
+  #safeEmit(event: keyof RuntimeEvents, payload: RuntimeEvents[keyof RuntimeEvents]): void {
+    try {
+      this.#emitter.emit(event, payload);
+    } catch (error) {
+      process.emitWarning(`RuntimeEventBus listener failure: ${event}`, {
+        code: 'RUNTIME_EVENT_BUS_LISTENER_FAILURE',
+        detail: error instanceof Error ? error.stack : String(error),
+      });
+    }
   }
 }

@@ -49,6 +49,7 @@ export class RuntimeBlockingPipeline implements RuntimeExecutionPipeline {
       progressive.multiplier,
       progressive.maxBlockSeconds,
       progressive.violationTtlSeconds,
+      context.signal,
     );
 
     if (result.blocked) {

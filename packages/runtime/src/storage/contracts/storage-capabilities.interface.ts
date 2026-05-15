@@ -54,6 +54,7 @@ export interface GcraConsumeCapability {
     key: string,
     emissionMs: number,
     burst: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     remaining: number;
@@ -65,6 +66,8 @@ export interface FixedWindowPeekCapability {
   peekFixedWindow(
     key: string,
     limit: number,
+    durationMs: number,
+    signal?: AbortSignal,
   ): Promise<{
     current: number;
     remaining: number;
@@ -77,6 +80,7 @@ export interface GcraPeekCapability {
     key: string,
     emissionMs: number,
     burst: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     remaining: number;
@@ -89,6 +93,7 @@ export interface FixedWindowConsumeCapability {
     key: string,
     limit: number,
     durationMs: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     current: number;
@@ -103,6 +108,7 @@ export interface BlockingConsumeCapability {
     blockKey: string,
     limit: number,
     durationMs: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     blocked: boolean;
@@ -122,6 +128,7 @@ export interface ProgressiveBlockingCapability {
     multiplier: number,
     maxBlockSeconds: number,
     violationTtlSeconds: number,
+    signal?: AbortSignal,
   ): Promise<{
     allowed: boolean;
     blocked: boolean;
@@ -138,6 +145,7 @@ export interface BurstConsumeCapability {
     sustainedDurationMs: number,
     burstLimit: number,
     burstDurationMs: number,
+    signal?: AbortSignal,
   ): Promise<BurstConsumeResult>;
 }
 
@@ -147,6 +155,7 @@ export interface BurstPeekCapability {
     burstKey: string,
     sustainedLimit: number,
     burstLimit: number,
+    signal?: AbortSignal,
   ): Promise<BurstPeekResult>;
 }
 
@@ -156,6 +165,7 @@ export interface AdjustmentCapability {
     operationKey: string,
     delta: number,
     operationTtlSeconds: number,
+    signal?: AbortSignal,
   ): Promise<{ applied: boolean; duplicate: boolean; expired: boolean; value: number }>;
 
   adjustBurstIdempotent(
@@ -164,10 +174,11 @@ export interface AdjustmentCapability {
     operationKey: string,
     delta: number,
     operationTtlSeconds: number,
+    signal?: AbortSignal,
   ): Promise<{ applied: boolean; burst: number; duplicate: boolean; expired: boolean; sustained: number }>;
 }
 
 export interface RedisTimeCapability {
-  now(): Promise<number>;
+  now(signal?: AbortSignal): Promise<number>;
 }
 export interface PeekCapability extends FixedWindowPeekCapability, BurstPeekCapability, GcraPeekCapability {}

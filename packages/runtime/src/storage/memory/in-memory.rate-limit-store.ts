@@ -8,6 +8,7 @@ import type {
   TokenBucketRecord,
   ViolationRecord,
 } from '../contracts/storage-record.types';
+import { MemoryExpirationSweeper } from './internal/memory-expiration-sweeper';
 import { MemoryLockManager } from './internal/memory-lock.manager';
 
 interface Entry<T> {
@@ -20,6 +21,8 @@ export class InMemoryRateLimitStore implements RuntimeStore {
   readonly #store = new Map<string, Entry<unknown>>();
 
   readonly #locks = new MemoryLockManager();
+
+  readonly #sweeper = new MemoryExpirationSweeper(this.#store);
 
   capabilities(): RuntimeStoreCapabilities {
     return {
@@ -308,5 +311,9 @@ export class InMemoryRateLimitStore implements RuntimeStore {
 
   async delete(key: string): Promise<void> {
     this.#store.delete(key);
+  }
+
+  destroy(): void {
+    this.#sweeper.destroy();
   }
 }

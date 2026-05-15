@@ -43,6 +43,8 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
       const durationMs = this.#monotonicClock.now() - started;
 
+      const finishedAt = await this.#clock.now();
+
       this.#events.emitDecision({
         limiter: request.definition.name,
 
@@ -62,7 +64,7 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
         blocked: isBlocked(result),
 
-        timestamp: Date.now(),
+        timestamp: finishedAt,
       });
 
       this.#events.emitMetrics({
@@ -76,7 +78,7 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
         blocked: isBlocked(result),
 
-        timestamp: Date.now(),
+        timestamp: finishedAt,
       });
 
       this.#events.emitTracing({
@@ -86,7 +88,7 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
         startedAt,
 
-        finishedAt: Date.now(),
+        finishedAt,
 
         durationMs,
 
@@ -95,7 +97,9 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
       return result;
     } catch (error) {
-      const durationMs = performance.now() - started;
+      const durationMs = this.#monotonicClock.now() - started;
+
+      const finishedAt = await this.#clock.now();
 
       this.#events.emitMetrics({
         limiter: request.definition.name,
@@ -108,7 +112,7 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
         blocked: false,
 
-        timestamp: Date.now(),
+        timestamp: finishedAt,
       });
 
       this.#events.emitTracing({
@@ -118,7 +122,7 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
         startedAt,
 
-        finishedAt: Date.now(),
+        finishedAt,
 
         durationMs,
 
@@ -136,10 +140,12 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
     const started = this.#monotonicClock.now();
 
-    const startedAt = Date.now();
+    const startedAt = await this.#clock.now();
 
     try {
       const result = await this.#pipeline.peek(context);
+
+      const finishedAt = await this.#clock.now();
 
       this.#events.emitTracing({
         limiter: request.definition.name,
@@ -148,15 +154,17 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
         startedAt,
 
-        finishedAt: Date.now(),
+        finishedAt,
 
-        durationMs: performance.now() - started,
+        durationMs: this.#monotonicClock.now() - started,
 
         success: true,
       });
 
       return result;
     } catch (error) {
+      const finishedAt = await this.#clock.now();
+
       this.#events.emitTracing({
         limiter: request.definition.name,
 
@@ -164,9 +172,9 @@ export class DefaultRuntimeExecutor implements RuntimeExecutor {
 
         startedAt,
 
-        finishedAt: Date.now(),
+        finishedAt,
 
-        durationMs: performance.now() - started,
+        durationMs: this.#monotonicClock.now() - started,
 
         success: false,
 

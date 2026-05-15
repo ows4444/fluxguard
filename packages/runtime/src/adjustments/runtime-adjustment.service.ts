@@ -1,6 +1,7 @@
 import type { RateLimitAdjustmentOptions } from '@fluxguard/contracts';
 
 import type { RuntimeLimiterDefinition } from '../core';
+import { RuntimeExecutionError } from '../errors';
 import type { RuntimeStore } from '../storage/contracts/runtime-store.interface';
 
 export interface RuntimeAdjustmentServiceOptions {
@@ -23,10 +24,10 @@ export class RuntimeAdjustmentService {
 
     if (runtime.algorithm === 'burst') {
       if (!this.#storage.adjustBurstIdempotent) {
-        throw new Error('Burst adjustments unsupported');
+        throw new RuntimeExecutionError('Burst adjustments unsupported');
       }
 
-      await this.#storage.adjustBurstIdempotent(
+      const result = await this.#storage.adjustBurstIdempotent(
         `${key}:sustained`,
         `${key}:burst`,
         operationKey,
@@ -34,15 +35,31 @@ export class RuntimeAdjustmentService {
         60,
       );
 
+      if (result.duplicate) {
+        throw new RuntimeExecutionError(`Duplicate adjustment operation: ${operationId}`);
+      }
+
+      if (result.expired) {
+        throw new RuntimeExecutionError(`Adjustment target expired: ${key}`);
+      }
+
       return;
     }
 
     if (runtime.algorithm === 'fixed') {
       if (!this.#storage.adjustFixedWindowIdempotent) {
-        throw new Error('Fixed-window adjustments unsupported');
+        throw new RuntimeExecutionError('Fixed-window adjustments unsupported');
       }
 
-      await this.#storage.adjustFixedWindowIdempotent(key, operationKey, options.amount ?? 1, 60);
+      const result = await this.#storage.adjustFixedWindowIdempotent(key, operationKey, options.amount ?? 1, 60);
+
+      if (result.duplicate) {
+        throw new Error(`Duplicate adjustment operation: ${operationId}`);
+      }
+
+      if (result.expired) {
+        throw new Error(`Adjustment target expired: ${key}`);
+      }
     }
   }
 }

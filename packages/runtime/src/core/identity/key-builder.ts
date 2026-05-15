@@ -1,6 +1,7 @@
 import type { RateLimitContext } from '@fluxguard/contracts';
 
 import type { RuntimeIdentityPolicy } from '../../config/index';
+import { RuntimeExecutionError } from '../../errors';
 import { RuntimeKeyNormalizer } from './runtime-key.normalizer';
 
 const normalizer = new RuntimeKeyNormalizer();
@@ -20,6 +21,12 @@ export function buildRuntimeKey(limiterName: string, context: RateLimitContext, 
     }
 
     segments.push(`${segment}:${normalizer.normalize(value)}`);
+  }
+
+  if (segments.length === 1) {
+    throw new RuntimeExecutionError(
+      `Unable to build runtime key for limiter "${limiterName}": no identity segments resolved`,
+    );
   }
 
   return segments.join(':');

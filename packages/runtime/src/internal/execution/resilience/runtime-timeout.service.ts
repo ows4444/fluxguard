@@ -6,6 +6,14 @@ export class RuntimeTimeoutError extends Error {
   }
 }
 
+export class RuntimeOverloadError extends Error {
+  override readonly name = 'RuntimeOverloadError';
+
+  constructor(limit: number) {
+    super(`Runtime timeout service overloaded (limit: ${limit})`);
+  }
+}
+
 export interface RuntimeTimeoutExecutionContext {
   readonly signal: AbortSignal;
 
@@ -13,10 +21,20 @@ export interface RuntimeTimeoutExecutionContext {
 }
 
 export class RuntimeTimeoutService {
+  static readonly MAX_ACTIVE_OPERATIONS = 10_000;
+
+  #activeOperations = 0;
+
   async execute<T>(
     operationFactory: (context: RuntimeTimeoutExecutionContext) => Promise<T>,
     timeoutMs: number,
   ): Promise<T> {
+    if (this.#activeOperations >= RuntimeTimeoutService.MAX_ACTIVE_OPERATIONS) {
+      throw new RuntimeOverloadError(RuntimeTimeoutService.MAX_ACTIVE_OPERATIONS);
+    }
+
+    this.#activeOperations += 1;
+
     const controller = new AbortController();
 
     let timeout: NodeJS.Timeout | undefined;
@@ -26,13 +44,20 @@ export class RuntimeTimeoutService {
     let timedOut = false;
 
     const finalize = (): void => {
+      if (settled) {
+        return;
+      }
+
       settled = true;
+
+      this.#activeOperations -= 1;
 
       if (timeout) {
         clearTimeout(timeout);
 
         timeout = undefined;
       }
+      controller.signal.onabort = null;
     };
 
     return await new Promise<T>((resolve, reject) => {
@@ -45,7 +70,9 @@ export class RuntimeTimeoutService {
 
         const timeoutError = new RuntimeTimeoutError(timeoutMs);
 
-        controller.abort(timeoutError);
+        if (!controller.signal.aborted) {
+          controller.abort(timeoutError);
+        }
 
         finalize();
 

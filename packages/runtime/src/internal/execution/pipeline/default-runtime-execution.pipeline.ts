@@ -24,7 +24,7 @@ export class DefaultRuntimeExecutionPipeline implements RuntimeExecutionPipeline
   async consume(context: RuntimeExecutionContext): Promise<ConsumeResult> {
     throwIfAborted(context.signal);
 
-    const algorithm = await this.#algorithm.consume(context.key, context.startedAt);
+    const algorithm = await this.#algorithm.consume(context.key, context.startedAt, context.signal);
 
     throwIfAborted(context.signal);
 
@@ -38,7 +38,7 @@ export class DefaultRuntimeExecutionPipeline implements RuntimeExecutionPipeline
 
   async peek(context: RuntimeExecutionContext): Promise<PeekResult> {
     throwIfAborted(context.signal);
-    const algorithm = await this.#algorithm.peek(context.key, context.startedAt);
+    const algorithm = await this.#algorithm.peek(context.key, context.startedAt, context.signal);
     throwIfAborted(context.signal);
 
     const execution: RuntimeExecutionResult = {

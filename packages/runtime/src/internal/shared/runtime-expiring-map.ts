@@ -29,6 +29,8 @@ export class RuntimeExpiringMap<T> {
 
   readonly #cleanupTimer?: NodeJS.Timeout;
 
+  #destroyed = false;
+
   constructor(options: RuntimeExpiringMapOptions) {
     this.#maxSize = options.maxSize;
 
@@ -44,6 +46,10 @@ export class RuntimeExpiringMap<T> {
   }
 
   get(key: string): T | undefined {
+    if (this.#destroyed) {
+      return undefined;
+    }
+
     const existing = this.#entries.get(key);
 
     if (!existing) {
@@ -60,6 +66,10 @@ export class RuntimeExpiringMap<T> {
   }
 
   set(key: string, value: T, expiresAt: number): void {
+    if (this.#destroyed) {
+      return;
+    }
+
     this.evictExpired(RuntimeExpiringMap.MAX_CLEANUP_PER_WRITE);
 
     if (this.#entries.size >= this.#maxSize) {
@@ -89,12 +99,24 @@ export class RuntimeExpiringMap<T> {
   }
 
   destroy(): void {
+    if (this.#destroyed) {
+      return;
+    }
+
+    this.#destroyed = true;
+
     if (this.#cleanupTimer) {
       clearInterval(this.#cleanupTimer);
     }
+
+    this.#entries.clear();
   }
 
   private evictExpired(limit: number): void {
+    if (this.#entries.size === 0) {
+      return;
+    }
+
     const now = Date.now();
 
     let cleaned = 0;
@@ -113,7 +135,7 @@ export class RuntimeExpiringMap<T> {
   }
 
   private evictOldest(): void {
-    this.evictExpired();
+    this.evictExpired(this.#maxCleanupPerSweep);
 
     const oldest = this.#entries.keys().next();
 

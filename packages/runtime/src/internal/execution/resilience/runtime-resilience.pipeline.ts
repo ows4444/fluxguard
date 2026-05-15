@@ -7,6 +7,7 @@ import type { RuntimeExecutionContext } from '../runtime-execution-context';
 import { RuntimeExecutionAbortedError } from './runtime-aborted.error';
 import { RuntimeCircuitBreakerOpenError } from './runtime-circuit-breaker.error';
 import { RuntimeFailPolicyService } from './runtime-fail-policy.service';
+import { isInfrastructureError } from './runtime-infrastructure-error.utils';
 import type { RuntimeResilienceState } from './runtime-resilience.state';
 import { RuntimeTimeoutError, RuntimeTimeoutService } from './runtime-timeout.service';
 
@@ -59,6 +60,10 @@ export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
     const started = this.#monotonicNow();
 
     try {
+      if (this.#health.isOpen()) {
+        throw new RuntimeCircuitBreakerOpenError();
+      }
+
       if (!this.#state.breaker.canExecute()) {
         throw new RuntimeCircuitBreakerOpenError();
       }
@@ -79,6 +84,10 @@ export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
       this.#state.latency.record(this.#monotonicNow() - started);
 
       this.#state.breaker.success();
+
+      if (this.#health.isHealthy() && !this.#state.breaker.isOpen()) {
+        this.#state.endDegradedPeriod();
+      }
 
       return result;
     } catch (error) {
@@ -105,6 +114,14 @@ export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
       const failOpen = this.#policy.shouldAllowOnFailure(context.definition.descriptor.resilience.failBehavior);
 
       if (failOpen) {
+        this.#state.beginDegradedPeriod();
+
+        if (!this.#state.canUseDegradedMode()) {
+          throw new RuntimeInfrastructureError(`Limiter degraded mode budget exhausted: ${context.definition.name}`, {
+            cause: error,
+          });
+        }
+
         const allowance = context.definition.descriptor.resilience.degradedAllowancePerSecond;
 
         const allowed = this.#state.degradation.shouldAllow(context.definition.name, context.key, allowance);
@@ -121,16 +138,68 @@ export class RuntimeResiliencePipeline implements RuntimeExecutionPipeline {
       });
     }
   }
-
   async peek(context: RuntimeExecutionContext): Promise<PeekResult> {
-    return this.#pipeline.peek(context);
+    const started = this.#monotonicNow();
+
+    try {
+      if (this.#health.isOpen()) {
+        throw new RuntimeCircuitBreakerOpenError();
+      }
+
+      if (!this.#state.breaker.canExecute()) {
+        throw new RuntimeCircuitBreakerOpenError();
+      }
+
+      const result = await this.#timeout.execute(async ({ signal, timedOut }) => {
+        const response = await this.#pipeline.peek({
+          ...context,
+          signal,
+        });
+
+        if (timedOut()) {
+          throw new RuntimeTimeoutError(context.definition.descriptor.execution.timeoutMs);
+        }
+
+        return response;
+      }, context.definition.descriptor.execution.timeoutMs);
+
+      this.#state.latency.record(this.#monotonicNow() - started);
+
+      this.#state.breaker.success();
+
+      if (this.#health.isHealthy() && !this.#state.breaker.isOpen()) {
+        this.#state.endDegradedPeriod();
+      }
+
+      return result;
+    } catch (error) {
+      const durationMs = this.#monotonicNow() - started;
+
+      this.#state.latency.record(durationMs);
+
+      if (!(error instanceof RuntimeExecutionAbortedError) && this.isInfrastructureFailure(error)) {
+        this.#state.breaker.failure();
+      }
+
+      this.#onFailure?.({
+        limiter: context.definition.name,
+
+        key: context.key,
+
+        reason: error instanceof Error ? error.message : 'UNKNOWN',
+
+        timestamp: this.#wallClockNow(),
+
+        durationMs,
+      });
+
+      throw new RuntimeInfrastructureError(`Limiter peek failed: ${context.definition.name}`, {
+        cause: error,
+      });
+    }
   }
 
   private isInfrastructureFailure(error: unknown): boolean {
-    return (
-      error instanceof RuntimeInfrastructureError ||
-      error instanceof RuntimeCircuitBreakerOpenError ||
-      error instanceof RuntimeTimeoutError
-    );
+    return isInfrastructureError(error);
   }
 }

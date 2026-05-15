@@ -29,6 +29,14 @@ export class RuntimeStoreHealthMonitor {
     return this.#machine.isTerminalOpen();
   }
 
+  isDegraded(): boolean {
+    return this.#machine.isDegraded();
+  }
+
+  isHealthy(): boolean {
+    return this.#machine.isActive();
+  }
+
   async check(): Promise<void> {
     const health = await this.#storage.health();
 

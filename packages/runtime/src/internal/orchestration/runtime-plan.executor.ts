@@ -75,6 +75,8 @@ export class RuntimePlanExecutor {
   async peek(definitions: readonly RuntimeLimiterDefinition[], context: RateLimitContext): Promise<PeekResult> {
     const graph = this.#graphs.compile(definitions);
 
+    let finalResult: PeekResult | null = null;
+
     for (const node of graph.nodes) {
       const definition = node.limiter;
 
@@ -99,32 +101,23 @@ export class RuntimePlanExecutor {
 
       const result = concurrencyGroup ? await this.#concurrency.execute(concurrencyGroup, execute) : await execute();
 
+      finalResult = result;
+
       if (!isAllowed(result)) {
         return result;
       }
     }
 
-    const last = graph.nodes[graph.nodes.length - 1]?.limiter;
-
-    if (!last) {
+    if (!finalResult) {
       throw new Error('Execution plan resolved no limiters');
     }
 
-    const executor = this.#resolver.getExecutor(last.name);
+    return finalResult;
+  }
 
-    const key = buildRuntimeKey(last.name, context, last.descriptor.identity);
+  destroy(): void {
+    this.#concurrency.destroy();
 
-    this.#hotkeys.register(key);
-
-    const execute = async () =>
-      executor.peek({
-        definition: last,
-        context,
-        key,
-      });
-
-    const concurrencyGroup = last.descriptor.execution.concurrencyGroup;
-
-    return concurrencyGroup ? this.#concurrency.execute(concurrencyGroup, execute) : execute();
+    this.#hotkeys.destroy();
   }
 }

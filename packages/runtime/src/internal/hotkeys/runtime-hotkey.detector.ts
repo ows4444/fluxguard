@@ -70,9 +70,15 @@ export class RuntimeHotKeyDetector {
     if (existing.hits >= this.#threshold) {
       existing.suppressedUntil = now + this.#suppressionMs;
 
+      this.#entries.set(key, existing, existing.expiresAt);
+
       return;
     }
-
+    this.#entries.set(key, existing, existing.expiresAt);
     return;
+  }
+
+  destroy(): void {
+    this.#entries.destroy();
   }
 }

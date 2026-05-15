@@ -30,9 +30,9 @@ export class FixedWindowAlgorithm implements RuntimeAlgorithm {
     this.#storage = options.storage;
   }
 
-  async consume(key: string, _now: number): Promise<AlgorithmConsumeResult> {
+  async consume(key: string, _now: number, signal?: AbortSignal): Promise<AlgorithmConsumeResult> {
     if (this.#storage.consumeFixedWindow) {
-      const result = await this.#storage.consumeFixedWindow(key, this.#limit, this.#durationMs);
+      const result = await this.#storage.consumeFixedWindow(key, this.#limit, this.#durationMs, signal);
 
       return {
         allowed: result.allowed,
@@ -60,9 +60,9 @@ export class FixedWindowAlgorithm implements RuntimeAlgorithm {
     };
   }
 
-  async peek(key: string, _now: number): Promise<AlgorithmConsumeResult> {
+  async peek(key: string, _now: number, signal?: AbortSignal): Promise<AlgorithmConsumeResult> {
     if (this.#storage.peekFixedWindow) {
-      const result = await this.#storage.peekFixedWindow(key, this.#limit);
+      const result = await this.#storage.peekFixedWindow(key, this.#limit, this.#durationMs, signal);
 
       return {
         allowed: result.remaining > 0,

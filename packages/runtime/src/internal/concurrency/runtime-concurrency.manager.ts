@@ -35,6 +35,8 @@ interface QueueEntry {
 
   ownerId?: number;
 
+  leaseTimeout?: NodeJS.Timeout;
+
   pending: Map<number, PendingEntry>;
 
   order: number[];
@@ -48,6 +50,8 @@ export class RuntimeConcurrencyManager {
   static readonly WAIT_TIMEOUT_MS = 5_000;
 
   static readonly MAX_QUEUE_DRAIN = 1024;
+
+  static readonly EXECUTION_LEASE_TIMEOUT_MS = 30_000;
 
   readonly #groups = new Map<string, QueueEntry>();
 
@@ -76,17 +80,45 @@ export class RuntimeConcurrencyManager {
 
     this.#groups.set(group, queue);
 
-    if (queue.active) {
-      await this.waitForTurn(group, queue, composed.signal);
-    }
-    queue.ownerId ??= 0;
+    const ownerId = queue.active ? await this.waitForTurn(group, queue, composed.signal) : ++this.#nextPendingId;
 
     queue.active = true;
+    queue.ownerId = ownerId;
+
+    queue.leaseTimeout = setTimeout(() => {
+      if (!queue.active || queue.ownerId !== ownerId) {
+        return;
+      }
+
+      process.emitWarning(
+        `RuntimeConcurrencyManager lease exceeded for group "${group}" after ${RuntimeConcurrencyManager.EXECUTION_LEASE_TIMEOUT_MS}ms`,
+        {
+          code: 'RUNTIME_CONCURRENCY_LEASE_EXCEEDED',
+        },
+      );
+    }, RuntimeConcurrencyManager.EXECUTION_LEASE_TIMEOUT_MS);
+
+    queue.leaseTimeout.unref?.();
 
     try {
       return await task({ signal: composed.signal });
     } finally {
       composed.cleanup();
+
+      if (queue.ownerId !== ownerId) {
+        process.emitWarning(`RuntimeConcurrencyManager ownership mismatch detected for group "${group}"`, {
+          code: 'RUNTIME_CONCURRENCY_OWNER_MISMATCH',
+        });
+
+        return;
+      }
+
+      if (queue.leaseTimeout) {
+        clearTimeout(queue.leaseTimeout);
+
+        queue.leaseTimeout = undefined;
+      }
+
       const transferred = this.releaseNext(queue);
 
       if (!transferred) {
@@ -134,8 +166,6 @@ export class RuntimeConcurrencyManager {
         createdAt: Date.now(),
 
         resolve: () => {
-          queue.ownerId = id;
-
           finalize(() => resolve(id));
         },
 
@@ -186,7 +216,6 @@ export class RuntimeConcurrencyManager {
       const next = queue.pending.get(nextId);
 
       if (next) {
-        queue.ownerId = next.id;
         next.resolve();
 
         return true;
