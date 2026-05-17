@@ -24,23 +24,27 @@ export interface RuntimeStorage<TState> {
   set(key: string, value: TState, expiresAt?: UnixTimestampMs): void;
 
   /**
-   * Synchronously updates a single storage key.
+   * Atomically updates a single storage key.
    *
-   * Guarantees for synchronous in-process implementations:
-   * - updater executes once per invocation
-   * - updater observes latest visible state
+   * Contract guarantees:
+   * - updater observes a logically consistent state snapshot
+   * - committed updates become atomically visible
+   * - intermediate updater state MUST NOT be externally observable
    *
-   * Distributed or concurrent implementations MAY:
-   * - require external locking
-   * - reject under contention
-   * - provide weaker consistency guarantees
+   * IMPORTANT:
+   * - updater functions MUST remain side-effect free
+   * - distributed implementations MAY execute updater multiple times
+   *   under optimistic concurrency or retry contention
+   * - callers MUST NOT rely on exactly-once updater execution
    *
    * Implementations MUST NOT:
    * - partially commit updates
    * - expose intermediate updater state
-   * - execute updater multiple times without isolation
    */
-  update<TResult>(key: string, updater: (current: TState | undefined) => StorageUpdateResult<TState, TResult>): TResult;
+  update<TResult>(
+    key: string,
+    transition: (current: TState | undefined) => StorageUpdateResult<TState, TResult>,
+  ): TResult;
 
   delete(key: string): void;
 

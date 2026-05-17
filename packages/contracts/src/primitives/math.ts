@@ -7,7 +7,7 @@ import {
   unixTimestampMs,
 } from './constructors';
 import type { ConsumedRateLimitPoints, RateLimitPoints, RemainingRateLimitPoints } from './rate-limit.types';
-import { safeIntegerAdd, safeIntegerMultiply } from './safe-integer';
+import { safeIntegerAdd, safeIntegerMultiply, safeIntegerSubtract } from './safe-integer';
 import type { DurationMilliseconds, MonotonicTimestampMs, Seconds, UnixTimestampMs } from './time.types';
 
 export function calculateRemainingRateLimitPoints(
@@ -30,14 +30,14 @@ export function durationToMilliseconds(duration: Seconds): DurationMilliseconds 
 }
 
 export function durationBetweenUnixTimestamps(left: UnixTimestampMs, right: UnixTimestampMs): DurationMilliseconds {
-  return durationMilliseconds(Math.max(0, left - right));
+  return durationMilliseconds(Math.max(0, safeIntegerSubtract(left, right, 'DurationMilliseconds')));
 }
 
 export function durationBetweenMonotonicTimestamps(
   left: MonotonicTimestampMs,
   right: MonotonicTimestampMs,
 ): DurationMilliseconds {
-  return durationMilliseconds(Math.max(0, left - right));
+  return durationMilliseconds(Math.max(0, safeIntegerSubtract(left, right, 'DurationMilliseconds')));
 }
 
 export function addDurationToUnixTimestamp(
@@ -58,7 +58,7 @@ export function subtractDurationFromMonotonicTimestamp(
   timestamp: MonotonicTimestampMs,
   duration: DurationMilliseconds,
 ): MonotonicTimestampMs {
-  return monotonicTimestampMs(Math.max(0, timestamp - duration));
+  return monotonicTimestampMs(Math.max(0, safeIntegerSubtract(timestamp, duration, 'MonotonicTimestampMs')));
 }
 
 export function subtractDuration(left: DurationMilliseconds, right: DurationMilliseconds): DurationMilliseconds {

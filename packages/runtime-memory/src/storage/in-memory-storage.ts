@@ -2,8 +2,6 @@ import { type Clock, RateLimiterInfrastructureError, type UnixTimestampMs } from
 
 import type { RuntimeStorage, StorageEntry, StorageUpdateResult } from './runtime-storage';
 
-const DEFAULT_SWEEP_INTERVAL = 1000;
-
 export interface InMemoryStorageOptions {
   readonly maxEntries?: number;
 }
@@ -30,29 +28,34 @@ export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
 
   private sweepIterator?: IterableIterator<[string, StorageEntry<TState>]>;
 
-  private writeCount = 0;
-
-  private lastSweepAt = 0;
+  private sweepTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly clock: Clock,
     private readonly options: InMemoryStorageOptions = {},
-  ) {}
+  ) {
+    this.sweepTimer = setInterval(() => {
+      try {
+        this.sweepExpiredEntries();
+      } catch {
+        /**
+         * Maintenance sweeping must never crash runtime execution.
+         */
+      }
+    }, DEFAULT_SWEEP_FREQUENCY_MS);
+
+    this.sweepTimer.unref?.();
+  }
 
   get(key: string): TState | undefined {
-    this.maybeSweep();
     return this.readActiveEntry(key)?.value;
   }
 
   set(key: string, value: TState, expiresAt?: UnixTimestampMs): void {
-    this.maybeSweep();
-
     this.storage.set(key, {
       value,
       ...(expiresAt !== undefined ? { expiresAt } : {}),
     });
-
-    this.onWrite();
   }
 
   delete(key: string): void {
@@ -60,12 +63,11 @@ export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
   }
   update<TResult>(
     key: string,
-    updater: (current: TState | undefined) => StorageUpdateResult<TState, TResult>,
+    transition: (current: TState | undefined) => StorageUpdateResult<TState, TResult>,
   ): TResult {
-    this.maybeSweep();
     const current = this.readActiveEntry(key)?.value;
 
-    const next = updater(current);
+    const next = transition(current);
 
     if (next.value === undefined) {
       this.storage.delete(key);
@@ -76,8 +78,6 @@ export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
         ...(next.expiresAt !== undefined ? { expiresAt: next.expiresAt } : {}),
       });
     }
-
-    this.onWrite();
 
     return next.result;
   }
@@ -121,34 +121,19 @@ export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
   }
 
   shutdown(): void {
+    if (this.sweepTimer) {
+      clearInterval(this.sweepTimer);
+
+      delete this.sweepTimer;
+    }
+
     this.storage.clear();
+
     delete this.sweepIterator;
   }
 
   size(): number {
     return this.storage.size;
-  }
-
-  private onWrite(): void {
-    this.writeCount += 1;
-
-    if (this.writeCount % DEFAULT_SWEEP_INTERVAL !== 0) {
-      return;
-    }
-
-    this.sweepExpiredEntries();
-  }
-
-  private maybeSweep(): void {
-    const now = this.clock.now();
-
-    if (now - this.lastSweepAt < DEFAULT_SWEEP_FREQUENCY_MS) {
-      return;
-    }
-
-    this.lastSweepAt = now;
-
-    this.sweepExpiredEntries();
   }
 
   private readActiveEntry(key: string): StorageEntry<TState> | undefined {

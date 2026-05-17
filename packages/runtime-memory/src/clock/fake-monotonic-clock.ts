@@ -1,5 +1,5 @@
 import type { MonotonicClock, MonotonicTimestampMs, RuntimeTimeSnapshot, UnixTimestampMs } from '@fluxguard/contracts';
-import { monotonicTimestampMs, unixTimestampMs } from '@fluxguard/contracts';
+import { monotonicTimestampMs, safeIntegerAdd, unixTimestampMs } from '@fluxguard/contracts';
 
 export interface FakeClockOptions {
   readonly startMonotonicMs?: number;
@@ -40,8 +40,8 @@ export class FakeMonotonicClock implements MonotonicClock {
       throw new RangeError('durationMs must be non-negative');
     }
 
-    this.wallClockMs += durationMs;
-    this.monotonicMs += durationMs;
+    this.wallClockMs = safeIntegerAdd(this.wallClockMs, durationMs, 'UnixTimestampMs');
+    this.monotonicMs = safeIntegerAdd(this.monotonicMs, durationMs, 'MonotonicTimestampMs');
   }
 
   setWallClock(timeMs: number): void {

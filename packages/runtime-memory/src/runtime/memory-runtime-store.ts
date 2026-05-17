@@ -14,7 +14,7 @@ import {
   type ShutdownOptions,
   validateRuntimeCapabilities,
 } from '@fluxguard/contracts';
-import { mapRuntimeError, withTimeout } from '@fluxguard/runtime';
+import { mapRuntimeError, RuntimeLifecycleError, withTimeout } from '@fluxguard/runtime';
 
 import { type CooldownConsumeDependencies } from '../cooldown';
 import { type FixedWindowConsumeDependencies, type GcraConsumeDependencies } from '../quota';
@@ -47,11 +47,13 @@ export interface MemoryRuntimeStoreDependencies extends CooldownConsumeDependenc
 
 export class MemoryRuntimeStore implements RuntimeStore {
   private acquireOperationLease(): () => void {
+    assertRuntimeActive(this.state);
+
     if (this.state !== RUNTIME_STATE.ACTIVE) {
-      assertRuntimeActive(this.state);
+      throw new RuntimeLifecycleError('Runtime is not accepting operations');
     }
 
-    this.inflightOperations += 1;
+    this.inflightOperations++;
 
     return () => {
       this.releaseOperationLease();
@@ -59,7 +61,11 @@ export class MemoryRuntimeStore implements RuntimeStore {
   }
 
   private releaseOperationLease(): void {
-    this.inflightOperations = Math.max(0, this.inflightOperations - 1);
+    if (this.inflightOperations === 0) {
+      throw new Error('Invariant violation: inflightOperations cannot be negative');
+    }
+
+    this.inflightOperations -= 1;
 
     if (this.inflightOperations === 0) {
       for (const resolve of this.drainResolvers) {
@@ -96,7 +102,8 @@ export class MemoryRuntimeStore implements RuntimeStore {
 
       const decision = await withTimeout(
         'consume',
-        (signal) => this.executeConsume(command, signal),
+
+        () => Promise.resolve(this.executeConsume(command)),
         command.config.executionTimeoutMs,
       );
 
@@ -151,7 +158,7 @@ export class MemoryRuntimeStore implements RuntimeStore {
     }
   }
 
-  private executeConsume(command: ConsumeCommand, signal: AbortSignal): RateLimitDecision {
+  private executeConsume(command: ConsumeCommand): RateLimitDecision {
     return dispatchConsume(command, this.dependencies);
   }
 
@@ -203,6 +210,10 @@ export class MemoryRuntimeStore implements RuntimeStore {
   }
 
   private async performShutdown(options?: ShutdownOptions): Promise<void> {
+    if (this.state !== RUNTIME_STATE.ACTIVE) {
+      return;
+    }
+
     this.state = RUNTIME_STATE.SHUTTING_DOWN;
 
     try {
