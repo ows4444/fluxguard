@@ -3,7 +3,7 @@ import path from 'path';
 
 const ROOT_DIR = process.cwd();
 const OUTPUT_PREFIX = 'combine-part';
-const MAX_CHARS = 160_000;
+const MAX_CHARS = 175_000;
 
 const INCLUDE_EXTENSIONS = new Set([
   '.ts',
@@ -38,6 +38,9 @@ const IGNORE_NAMES = new Set([
   'dist',
   'build',
   'README.md', //
+
+  'tsup.config.ts',
+  'vitest.config.ts',
 ]);
 
 const IGNORE_PATH_PREFIXES = [
@@ -45,6 +48,8 @@ const IGNORE_PATH_PREFIXES = [
   'tooling', //
   'test', //
   'packages/nestjs', //
+  // 'packages/runtime', //
+  'packages/contracts', //
   // 'packages', //
   'playground', //
   'scripts',

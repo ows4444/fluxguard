@@ -98,6 +98,15 @@ importers:
         specifier: ^5.10.1
         version: 5.10.1
 
+  packages/runtime-memory:
+    dependencies:
+      '@fluxguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@fluxguard/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
   playground/nest-app:
     dependencies:
       '@fluxguard/nestjs':

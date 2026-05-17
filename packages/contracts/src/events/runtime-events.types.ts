@@ -1,50 +1,27 @@
-import type { RateLimitKind } from '../config/rate-limit.types';
-import type { DecisionOutcome } from '../decisions/decision-outcome';
+import type { DurationMilliseconds } from '../primitives';
+import type { DurationEvent, TimestampedEvent } from './event-base.types';
+import type { BaseDecisionEvent } from './rate-limit-decision.event';
 
-export interface RuntimeDecisionEvent {
-  readonly limiter: string;
-
-  readonly key: string;
-
-  readonly outcome: DecisionOutcome;
-
-  readonly kind: RateLimitKind;
-
-  readonly remaining: number | null;
-
-  readonly retryAfter: number;
-
-  readonly durationMs: number;
-
-  readonly degraded: boolean;
-
-  readonly open?: boolean;
+export interface RuntimeDecisionEvent extends BaseDecisionEvent, DurationEvent, TimestampedEvent {
+  readonly correlationId?: string;
 
   readonly blocked: boolean;
+  readonly degraded: boolean;
+  readonly retryAfterMs: DurationMilliseconds;
 
-  readonly timestamp: number;
+  readonly open?: boolean;
 }
 
-export interface RuntimeFailureEvent {
-  readonly limiter: string;
-
+export interface RuntimeFailureEvent extends DurationEvent, TimestampedEvent {
   readonly key: string;
 
+  readonly limiterName: string;
   readonly reason: string;
-
-  readonly timestamp: number;
-
-  readonly durationMs: number;
 }
 
-export interface RuntimeStoreHealthEvent {
-  readonly healthy: boolean;
-
+export interface RuntimeStoreHealthEvent extends TimestampedEvent {
   readonly degraded: boolean;
-
-  readonly latencyMs?: number;
-
-  readonly timestamp: number;
-
+  readonly healthy: boolean;
+  readonly latencyMs?: DurationMilliseconds;
   readonly reason?: string;
 }

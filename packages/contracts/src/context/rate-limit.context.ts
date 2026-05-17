@@ -1,3 +1,5 @@
+import type { JsonPrimitive, ReadonlyRecord } from '../primitives';
+
 export interface RateLimitContext {
   readonly deviceId?: string;
   readonly userId?: string;
@@ -5,4 +7,4 @@ export interface RateLimitContext {
   readonly keyOverride?: string;
 }
 
-export type RuntimeContextAttributes = Record<string, string | undefined>;
+export type RuntimeContextAttributes = ReadonlyRecord<string, JsonPrimitive | undefined>;

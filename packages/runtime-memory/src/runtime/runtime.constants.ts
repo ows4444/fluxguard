@@ -1,0 +1,3 @@
+export const MEMORY_RUNTIME_LIMITS = {
+  STORAGE_PRESSURE_THRESHOLD: 100_000,
+} as const;

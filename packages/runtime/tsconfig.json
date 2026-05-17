@@ -6,6 +6,8 @@
 
     "outDir": "./dist",
 
+    "types": ["node"],
+
     "composite": true,
 
     "incremental": true,

@@ -1,4 +1,4 @@
-export const DecisionOutcome = {
+export const DECISION_OUTCOME = {
   ALLOWED: 'ALLOWED',
   REJECTED: 'REJECTED',
   BLOCKED: 'BLOCKED',
@@ -6,4 +6,4 @@ export const DecisionOutcome = {
   DEGRADED_REJECTED: 'DEGRADED_REJECTED',
 } as const;
 
-export type DecisionOutcome = (typeof DecisionOutcome)[keyof typeof DecisionOutcome];
+export type DecisionOutcome = (typeof DECISION_OUTCOME)[keyof typeof DECISION_OUTCOME];

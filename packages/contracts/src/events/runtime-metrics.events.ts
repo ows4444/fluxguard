@@ -1,27 +1,20 @@
-export interface RuntimeExecutionMetricsEvent {
-  readonly limiter: string;
+import type { RuntimeOperation } from '../runtime/runtime-operation.types';
+import type { DurationEvent, IntervalEvent, TimestampedEvent } from './event-base.types';
 
-  readonly durationMs: number;
+export interface RuntimeExecutionMetricsEvent extends DurationEvent, TimestampedEvent {
+  readonly limiterName: string;
 
   readonly success: boolean;
 
   readonly degraded: boolean;
 
   readonly blocked: boolean;
-
-  readonly timestamp: number;
 }
 
-export interface RuntimeTracingEvent {
-  readonly limiter: string;
+export interface RuntimeTracingEvent extends IntervalEvent {
+  readonly limiterName: string;
 
-  readonly operation: 'consume' | 'peek' | 'adjust';
-
-  readonly startedAt: number;
-
-  readonly finishedAt: number;
-
-  readonly durationMs: number;
+  readonly operation: RuntimeOperation;
 
   readonly success: boolean;
 

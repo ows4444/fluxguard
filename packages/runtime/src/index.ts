@@ -1,1 +1,2 @@
-export * from './public';
+export * from './errors';
+export * from './utils/with-timeout';
