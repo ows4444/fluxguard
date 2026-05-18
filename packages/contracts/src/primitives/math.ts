@@ -10,15 +10,14 @@ import type { ConsumedRateLimitPoints, RateLimitPoints, RemainingRateLimitPoints
 import { safeIntegerAdd, safeIntegerMultiply, safeIntegerSubtract } from './safe-integer';
 import type { DurationMilliseconds, MonotonicTimestampMs, Seconds, UnixTimestampMs } from './time.types';
 
-export function calculateRemainingRateLimitPoints(
-  limit: RateLimitPoints,
-  consumed: ConsumedRateLimitPoints,
-): RemainingRateLimitPoints {
-  return remainingRateLimitPoints(Math.max(0, subtractConsumedFromLimit(limit, consumed)));
+const MILLISECONDS_PER_SECOND = 1000;
+
+function saturatingSubtract(left: number, right: number, type: string): number {
+  return Math.max(0, safeIntegerSubtract(left, right, type));
 }
 
 export function addRateLimitPoints(value: RateLimitPoints, increment: number): RateLimitPoints {
-  return rateLimitPoints(value + increment);
+  return rateLimitPoints(safeIntegerAdd(value, increment, 'RateLimitPoints'));
 }
 
 export function emptyRemainingRateLimitPoints(): RemainingRateLimitPoints {
@@ -26,18 +25,18 @@ export function emptyRemainingRateLimitPoints(): RemainingRateLimitPoints {
 }
 
 export function durationToMilliseconds(duration: Seconds): DurationMilliseconds {
-  return durationMilliseconds(safeIntegerMultiply(duration, 1000, 'DurationMilliseconds'));
+  return durationMilliseconds(safeIntegerMultiply(duration, MILLISECONDS_PER_SECOND, 'DurationMilliseconds'));
 }
 
 export function durationBetweenUnixTimestamps(left: UnixTimestampMs, right: UnixTimestampMs): DurationMilliseconds {
-  return durationMilliseconds(Math.max(0, safeIntegerSubtract(left, right, 'DurationMilliseconds')));
+  return durationMilliseconds(saturatingSubtract(left, right, 'DurationMilliseconds'));
 }
 
 export function durationBetweenMonotonicTimestamps(
   left: MonotonicTimestampMs,
   right: MonotonicTimestampMs,
 ): DurationMilliseconds {
-  return durationMilliseconds(Math.max(0, safeIntegerSubtract(left, right, 'DurationMilliseconds')));
+  return durationMilliseconds(saturatingSubtract(left, right, 'DurationMilliseconds'));
 }
 
 export function addDurationToUnixTimestamp(
@@ -58,11 +57,11 @@ export function subtractDurationFromMonotonicTimestamp(
   timestamp: MonotonicTimestampMs,
   duration: DurationMilliseconds,
 ): MonotonicTimestampMs {
-  return monotonicTimestampMs(Math.max(0, safeIntegerSubtract(timestamp, duration, 'MonotonicTimestampMs')));
+  return monotonicTimestampMs(saturatingSubtract(timestamp, duration, 'MonotonicTimestampMs'));
 }
 
 export function subtractDuration(left: DurationMilliseconds, right: DurationMilliseconds): DurationMilliseconds {
-  return durationMilliseconds(Math.max(0, left - right));
+  return durationMilliseconds(saturatingSubtract(left, right, 'DurationMilliseconds'));
 }
 
 export function multiplyDuration(duration: DurationMilliseconds, multiplier: number): DurationMilliseconds {
@@ -73,10 +72,6 @@ export function addDurations(left: DurationMilliseconds, right: DurationMillisec
   return durationMilliseconds(safeIntegerAdd(left, right, 'DurationMilliseconds'));
 }
 
-export function subtractConsumedFromLimit(limit: RateLimitPoints, consumed: ConsumedRateLimitPoints): number {
-  return limit - consumed;
-}
-
 export function addConsumedRateLimitPoints(value: ConsumedRateLimitPoints, increment: number): ConsumedRateLimitPoints {
-  return consumedRateLimitPoints(value + increment);
+  return consumedRateLimitPoints(safeIntegerAdd(value, increment, 'ConsumedRateLimitPoints'));
 }

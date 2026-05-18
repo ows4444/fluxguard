@@ -1,4 +1,5 @@
 const MAX_KEY_LENGTH = 512;
+const INVISIBLE_UNICODE_PATTERN = /[\u200B-\u200D\uFEFF]/u;
 
 export function assertValidRateLimitKey(key: string): void {
   if (key.trim().length === 0) {
@@ -21,12 +22,22 @@ export interface BuildStorageKeyOptions {
 }
 
 function normalizeStorageKeyPart(value: string): string {
-  return value.normalize('NFKC').trim();
+  const normalized = value.normalize('NFC').trim();
+
+  if (INVISIBLE_UNICODE_PATTERN.test(normalized)) {
+    throw new TypeError('Storage key contains invisible Unicode characters');
+  }
+
+  return normalized;
 }
 
 function assertNonEmptyKeyPart(value: string, field: string): void {
   if (value.length === 0) {
     throw new TypeError(`${field} cannot be empty`);
+  }
+
+  if (value.includes(':')) {
+    throw new TypeError(`${field} cannot contain ":"`);
   }
 }
 
@@ -39,5 +50,8 @@ export function buildStorageKey(options: BuildStorageKeyOptions): string {
   assertNonEmptyKeyPart(limiter, 'limiter');
   assertNonEmptyKeyPart(key, 'key');
 
-  return `${namespace}:${limiter}:${key}`;
+  const storageKey = `${namespace}:${limiter}:${key}`;
+
+  assertValidRateLimitKey(storageKey);
+  return storageKey;
 }

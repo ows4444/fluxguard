@@ -1,4 +1,10 @@
-import type { ConsumedRateLimitPoints, Priority, RateLimitPoints, RemainingRateLimitPoints } from './rate-limit.types';
+import type {
+  ConsumedRateLimitPoints,
+  Priority,
+  RateLimitDelta,
+  RateLimitPoints,
+  RemainingRateLimitPoints,
+} from './rate-limit.types';
 import { assertSafeInteger } from './safe-integer';
 import type { DurationMilliseconds, MonotonicTimestampMs, Seconds, UnixTimestampMs } from './time.types';
 
@@ -79,4 +85,11 @@ export const monotonicTimestampMs = (value: number): MonotonicTimestampMs => {
   assertFiniteNonNegativeInteger(value, 'MonotonicTimestampMs');
 
   return value as MonotonicTimestampMs;
+};
+
+export const rateLimitDelta = (value: number): RateLimitDelta => {
+  assertFiniteNumber(value, 'RateLimitDelta');
+  assertSafeInteger(value, 'RateLimitDelta');
+
+  return value as RateLimitDelta;
 };

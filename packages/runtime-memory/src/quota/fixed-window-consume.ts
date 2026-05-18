@@ -1,7 +1,7 @@
 import {
   addConsumedRateLimitPoints,
   addDurationToUnixTimestamp,
-  calculateRemainingRateLimitPoints,
+  calculateRemainingCapacity,
   type Clock,
   type CompiledFixedWindowConfig,
   consumedRateLimitPoints,
@@ -9,7 +9,6 @@ import {
   createRejectedDecision,
   durationBetweenUnixTimestamps,
   type DurationMilliseconds,
-  durationMilliseconds,
   emptyRemainingRateLimitPoints,
   type RateLimitDecision,
   type UnixTimestampMs,
@@ -69,7 +68,7 @@ export function consumeFixedWindow(
       expiresAt: calculateFixedWindowExpiration(nextState.resetAt),
       result: createAllowedDecision({
         key,
-        remainingPoints: calculateRemainingRateLimitPoints(config.points, nextState.consumedPoints),
+        remainingPoints: calculateRemainingCapacity(config.points, nextState.consumedPoints),
       }),
     };
   });

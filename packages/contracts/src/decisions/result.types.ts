@@ -1,4 +1,4 @@
-import type { DecisionOutcome } from '../decisions/decision-outcome';
+import { DECISION_OUTCOME, type DecisionOutcome } from '../decisions/decision-outcome';
 import type { DurationMilliseconds, RemainingRateLimitPoints } from '../primitives';
 import { PEEK_CONSISTENCY } from '../runtime/runtime-consistency.types';
 
@@ -18,14 +18,34 @@ export interface ExposureMetadata {
   readonly errorCode?: string;
 }
 
-export interface RateLimitDecision extends ConsumeResult, ExposureMetadata {}
+interface BaseDecision extends ExposureMetadata {
+  readonly key: string;
+  readonly msBeforeNext: DurationMilliseconds;
+}
 
-export interface AdvisoryPeekResult extends RateLimitDecision {
+interface AllowedDecision extends BaseDecision {
+  readonly outcome: typeof DECISION_OUTCOME.ALLOWED;
+  readonly remainingPoints: RemainingRateLimitPoints;
+}
+
+interface BlockedDecision extends BaseDecision {
+  readonly outcome: typeof DECISION_OUTCOME.BLOCKED;
+  readonly remainingPoints: null;
+}
+
+interface RejectedDecision extends BaseDecision {
+  readonly outcome: typeof DECISION_OUTCOME.REJECTED;
+  readonly remainingPoints: RemainingRateLimitPoints | null;
+}
+
+export type RateLimitDecision = AllowedDecision | RejectedDecision | BlockedDecision;
+
+export type AdvisoryPeekResult = RateLimitDecision & {
   readonly consistency: typeof PEEK_CONSISTENCY.ADVISORY;
-}
+};
 
-export interface ConsistentPeekResult extends RateLimitDecision {
+export type ConsistentPeekResult = RateLimitDecision & {
   readonly consistency: typeof PEEK_CONSISTENCY.CONSISTENT;
-}
+};
 
 export type PeekResult = AdvisoryPeekResult | ConsistentPeekResult;

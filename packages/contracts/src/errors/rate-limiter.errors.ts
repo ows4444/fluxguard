@@ -12,6 +12,7 @@ export abstract class RateLimiterError extends Error {
     super(message, options);
 
     Object.setPrototypeOf(this, new.target.prototype);
+    this.name = new.target.name;
 
     this.retryable = options?.retryable ?? false;
   }
@@ -23,8 +24,6 @@ export class RateLimiterConfigurationError extends RateLimiterError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
   }
-
-  override readonly name: string = 'RateLimiterConfigurationError';
 }
 
 export class RateLimiterConsistencyError extends RateLimiterError {
@@ -33,21 +32,14 @@ export class RateLimiterConsistencyError extends RateLimiterError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
   }
-
-  override readonly name: string = 'RateLimiterConsistencyError';
 }
 
 export class RateLimiterInfrastructureError extends RateLimiterError {
   override readonly code: string = 'RATE_LIMITER_INFRASTRUCTURE_ERROR';
 
-  constructor(message: string, options?: ErrorOptions & { retryable?: boolean }) {
-    super(message, {
-      retryable: true,
-      ...options,
-    });
+  constructor(message: string, options: ErrorOptions & { retryable: boolean }) {
+    super(message, options);
   }
-
-  override readonly name: string = 'RateLimiterInfrastructureError';
 }
 
 export class RateLimiterUnsupportedOperationError extends RateLimiterError {
@@ -56,6 +48,12 @@ export class RateLimiterUnsupportedOperationError extends RateLimiterError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
   }
+}
 
-  override readonly name: string = 'RateLimiterUnsupportedOperationError';
+export class RateLimiterInvariantError extends RateLimiterError {
+  override readonly code: string = 'RATE_LIMITER_INVARIANT_ERROR';
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+  }
 }

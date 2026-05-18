@@ -37,8 +37,8 @@ export function createAllowedDecision(options: AllowedDecisionOptions): RateLimi
     outcome: DECISION_OUTCOME.ALLOWED,
     key: options.key,
     remainingPoints: options.remainingPoints,
-    exposure: options.exposure,
     msBeforeNext: durationMilliseconds(0),
+    ...(options.exposure ? { exposure: options.exposure } : {}),
   });
 }
 
@@ -56,10 +56,9 @@ export function createRejectedDecision(options: RejectedDecisionOptions): RateLi
   return createDecision({
     key: options.key,
     msBeforeNext: options.retryAfterMs,
-
     outcome: DECISION_OUTCOME.REJECTED,
-    exposure: options.exposure,
     remainingPoints: options.remainingPoints,
+    ...(options.exposure ? { exposure: options.exposure } : {}),
   });
 }
 
@@ -77,6 +76,6 @@ export function createBlockedDecision(options: BlockedDecisionOptions): RateLimi
     outcome: DECISION_OUTCOME.BLOCKED,
     remainingPoints: null,
     msBeforeNext: options.retryAfterMs,
-    exposure: options.exposure,
+    ...(options.exposure ? { exposure: options.exposure } : {}),
   });
 }

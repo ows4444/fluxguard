@@ -4,6 +4,7 @@ import {
   type DurationMilliseconds,
   durationMilliseconds,
   type MonotonicTimestampMs,
+  safeIntegerSubtract,
   type UnixTimestampMs,
 } from '@fluxguard/contracts';
 
@@ -22,7 +23,9 @@ export function calculateGcraExpiration(
   burstTolerance: DurationMilliseconds,
   emissionInterval: DurationMilliseconds,
 ): UnixTimestampMs {
-  const recoveryDuration = durationMilliseconds(Math.max(0, theoreticalArrivalTime - now));
+  const recoveryDuration = durationMilliseconds(
+    Math.max(0, safeIntegerSubtract(theoreticalArrivalTime, now, 'DurationMilliseconds')),
+  );
 
   /**
    * Retain state long enough for:

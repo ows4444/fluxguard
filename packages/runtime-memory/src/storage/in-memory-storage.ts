@@ -26,8 +26,6 @@ const DEFAULT_SWEEP_FREQUENCY_MS = 1000;
 export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
   private readonly storage = new Map<string, StorageEntry<TState>>();
 
-  private sweepIterator?: IterableIterator<[string, StorageEntry<TState>]>;
-
   private sweepTimer?: NodeJS.Timeout;
 
   constructor(
@@ -85,20 +83,7 @@ export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
   sweepExpiredEntries(limit = DEFAULT_SWEEP_BATCH_SIZE): number {
     let deletedCount = 0;
 
-    if (!this.sweepIterator) {
-      this.sweepIterator = this.storage.entries();
-    }
-
-    while (deletedCount < limit) {
-      const next = this.sweepIterator.next();
-
-      if (next.done) {
-        delete this.sweepIterator;
-        break;
-      }
-
-      const [key, entry] = next.value;
-
+    for (const [key, entry] of this.storage.entries()) {
       if (deletedCount >= limit) {
         break;
       }
@@ -117,7 +102,6 @@ export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
 
   clear(): void {
     this.storage.clear();
-    delete this.sweepIterator;
   }
 
   shutdown(): void {
@@ -128,8 +112,6 @@ export class InMemoryStorage<TState> implements RuntimeStorage<TState> {
     }
 
     this.storage.clear();
-
-    delete this.sweepIterator;
   }
 
   size(): number {

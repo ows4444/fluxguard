@@ -10,6 +10,7 @@ export * from './runtime-health.types';
 export * from './runtime-metadata.types';
 export * from './runtime-observer.types';
 export * from './runtime-operation.types';
+export * from './runtime-operation-context.types';
 export * from './runtime-shutdown.types';
 export * from './runtime-store.guards';
 export * from './runtime-store.types';

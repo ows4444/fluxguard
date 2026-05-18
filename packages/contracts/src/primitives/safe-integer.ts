@@ -15,7 +15,11 @@ export function safeIntegerAdd(left: number, right: number, type: string): numbe
 }
 
 export function safeIntegerMultiply(value: number, multiplier: number, type: string): number {
-  const result = Math.trunc(value * multiplier);
+  if (!Number.isInteger(value) || !Number.isInteger(multiplier)) {
+    throw new TypeError(`${type} multiplication operands must be integers`);
+  }
+
+  const result = value * multiplier;
 
   assertSafeInteger(result, type);
 

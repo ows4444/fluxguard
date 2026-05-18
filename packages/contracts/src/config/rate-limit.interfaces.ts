@@ -3,6 +3,7 @@ import type {
   DurationMilliseconds,
   JsonValue,
   Priority,
+  RateLimitDelta,
   RateLimitPoints,
   ReadonlyList,
   ReadonlyRecord,
@@ -16,6 +17,16 @@ export type FailBehavior = (typeof FAIL_BEHAVIOR)[keyof typeof FAIL_BEHAVIOR];
 
 export interface BurstConfig {
   readonly burstPoints: RateLimitPoints;
+
+  /**
+   * Upper bound for persisted GCRA state retention.
+   *
+   * Prevents:
+   * - stale limiter buildup
+   * - unbounded TTL amplification
+   * - distributed clock skew retention inflation
+   */
+  readonly maxRetentionMs?: DurationMilliseconds;
 }
 
 export interface ProgressiveBlockingConfig {
@@ -75,7 +86,7 @@ export interface RateLimitAdjustmentOptions {
   readonly key: string;
 
   readonly operationId?: string;
-  readonly amount?: RateLimitPoints;
+  readonly amount?: RateLimitDelta;
   readonly metadata?: ReadonlyRecord<string, JsonValue>;
   readonly reason?: string;
 }

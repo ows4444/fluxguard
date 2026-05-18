@@ -12,6 +12,8 @@ export interface ConsumeCommand {
   readonly correlationId?: string;
 
   readonly config: CompiledRateLimitConfig;
+
+  readonly signal?: AbortSignal;
 }
 
 export interface PeekCommand {
@@ -20,6 +22,8 @@ export interface PeekCommand {
   readonly correlationId?: string;
 
   readonly config: CompiledRateLimitConfig;
+
+  readonly signal?: AbortSignal;
 
   /**
    * advisory:

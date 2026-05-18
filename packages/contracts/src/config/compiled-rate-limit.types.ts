@@ -10,6 +10,7 @@ export interface GcraCompiledState extends BaseCompiledState {
   readonly burstCapacity: RateLimitPoints;
   readonly burstTolerance: DurationMilliseconds;
   readonly emissionInterval: DurationMilliseconds;
+  readonly maxRetentionMs: DurationMilliseconds;
 }
 
 export type CompiledCooldownConfig = Extract<

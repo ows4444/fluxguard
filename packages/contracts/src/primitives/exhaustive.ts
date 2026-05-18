@@ -1,5 +1,5 @@
-import { RateLimiterConfigurationError } from '../errors';
+import { RateLimiterInvariantError } from '../errors';
 
 export function assertNever(value: never): never {
-  throw new RateLimiterConfigurationError(`Unhandled value: ${String(value)}`);
+  throw new RateLimiterInvariantError(`Exhaustiveness assertion failed for unexpected value: ${String(value)}`);
 }

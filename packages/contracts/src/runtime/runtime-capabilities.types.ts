@@ -6,6 +6,11 @@ export interface RuntimeCapabilities {
   readonly consistentPeek: boolean;
 
   /**
+   * Runtime operations cooperatively observe AbortSignal.
+   */
+  readonly cooperativeCancellation: boolean;
+
+  /**
    * strongConsistency implies:
    * - singleProcessSerializedConsumption
    * - authoritative distributed coordination

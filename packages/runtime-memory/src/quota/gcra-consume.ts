@@ -50,17 +50,15 @@ export function consumeGcra(
     );
 
     if (!evaluation.allowed) {
-      const result: RateLimitDecision = createRejectedDecision({
-        key,
-        remainingPoints: evaluation.remainingPoints,
-        retryAfterMs: evaluation.retryAfterMs,
-        exposure: createExposureMetadata(config.message, config.errorCode),
-      });
-
       return {
-        ...(current ? { value: current } : {}),
+        value: current!,
         expiresAt: storageExpiration,
-        result,
+        result: createRejectedDecision({
+          key,
+          remainingPoints: evaluation.remainingPoints,
+          retryAfterMs: evaluation.retryAfterMs,
+          exposure: createExposureMetadata(config.message, config.errorCode),
+        }),
       };
     }
 

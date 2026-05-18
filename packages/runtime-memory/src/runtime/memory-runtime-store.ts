@@ -1,6 +1,8 @@
 import {
   assertValidRateLimitKey,
   type ConsumeCommand,
+  durationBetweenMonotonicTimestamps,
+  durationMilliseconds,
   type MonotonicClock,
   type PeekCommand,
   type PeekResult,
@@ -14,7 +16,13 @@ import {
   type ShutdownOptions,
   validateRuntimeCapabilities,
 } from '@fluxguard/contracts';
-import { mapRuntimeError, RuntimeLifecycleError, withTimeout } from '@fluxguard/runtime';
+import {
+  assertNotAborted,
+  composeAbortSignals,
+  mapRuntimeError,
+  RuntimeLifecycleError,
+  withTimeout,
+} from '@fluxguard/runtime';
 
 import { type CooldownConsumeDependencies } from '../cooldown';
 import { type FixedWindowConsumeDependencies, type GcraConsumeDependencies } from '../quota';
@@ -26,6 +34,7 @@ import { assertRuntimeActive } from './runtime-state.guards';
 import { RUNTIME_STATE, type RuntimeState } from './runtime-state.types';
 
 const MEMORY_RUNTIME_CAPABILITIES: RuntimeCapabilities = Object.freeze({
+  cooperativeCancellation: false,
   adjustments: false,
   singleProcessSerializedConsumption: true,
   consistentPeek: false,
@@ -46,12 +55,10 @@ export interface MemoryRuntimeStoreDependencies extends CooldownConsumeDependenc
 }
 
 export class MemoryRuntimeStore implements RuntimeStore {
+  private readonly shutdownController = new AbortController();
+
   private acquireOperationLease(): () => void {
     assertRuntimeActive(this.state);
-
-    if (this.state !== RUNTIME_STATE.ACTIVE) {
-      throw new RuntimeLifecycleError('Runtime is not accepting operations');
-    }
 
     this.inflightOperations++;
 
@@ -92,6 +99,8 @@ export class MemoryRuntimeStore implements RuntimeStore {
   constructor(private readonly dependencies: MemoryRuntimeStoreDependencies) {}
 
   async consume(command: ConsumeCommand): Promise<RateLimitDecision> {
+    command.signal?.throwIfAborted?.();
+
     const release = this.acquireOperationLease();
 
     const startedAt = this.dependencies.clock.now();
@@ -102,12 +111,27 @@ export class MemoryRuntimeStore implements RuntimeStore {
 
       const decision = await withTimeout(
         'consume',
+        (timeoutSignal) => {
+          const composed = composeAbortSignals([
+            timeoutSignal,
+            this.shutdownController.signal,
+            ...(command.signal ? [command.signal] : []),
+          ]);
 
-        () => Promise.resolve(this.executeConsume(command)),
+          return Promise.resolve(
+            this.executeConsume({
+              ...command,
+              signal: composed.signal,
+            }),
+          ).finally(() => {
+            composed.cleanup();
+          });
+        },
         command.config.executionTimeoutMs,
       );
 
-      const elapsedMs = this.dependencies.clock.monotonicNow() - operationStartedAt;
+      const elapsedMs = durationBetweenMonotonicTimestamps(this.dependencies.clock.monotonicNow(), operationStartedAt);
+
       safelyExecuteObserver(
         () => {
           this.dependencies.observer?.onDecision?.(
@@ -122,6 +146,7 @@ export class MemoryRuntimeStore implements RuntimeStore {
             }),
           );
         },
+        this.dependencies.observerDiagnostics,
         {
           operation: 'consume',
           correlationId: command.correlationId,
@@ -131,7 +156,8 @@ export class MemoryRuntimeStore implements RuntimeStore {
 
       return decision;
     } catch (error) {
-      const elapsedMs = this.dependencies.clock.monotonicNow() - operationStartedAt;
+      const elapsedMs = durationBetweenMonotonicTimestamps(this.dependencies.clock.monotonicNow(), operationStartedAt);
+
       safelyExecuteObserver(
         () => {
           this.dependencies.observer?.onFailure?.(
@@ -144,7 +170,7 @@ export class MemoryRuntimeStore implements RuntimeStore {
             }),
           );
         },
-
+        this.dependencies.observerDiagnostics,
         {
           operation: 'consume',
           correlationId: command.correlationId,
@@ -159,6 +185,7 @@ export class MemoryRuntimeStore implements RuntimeStore {
   }
 
   private executeConsume(command: ConsumeCommand): RateLimitDecision {
+    assertNotAborted(command.signal);
     return dispatchConsume(command, this.dependencies);
   }
 
@@ -172,7 +199,7 @@ export class MemoryRuntimeStore implements RuntimeStore {
     }
   }
 
-  health(): Promise<RuntimeHealthStatus> {
+  async health(): Promise<RuntimeHealthStatus> {
     if (this.state === RUNTIME_STATE.SHUTDOWN) {
       return {
         healthy: false,
@@ -199,7 +226,12 @@ export class MemoryRuntimeStore implements RuntimeStore {
     }
   }
 
-  async shutdown(options?: ShutdownOptions): Promise<void> {
+  async shutdown(
+    options: ShutdownOptions = {
+      graceful: true,
+      timeoutMs: durationMilliseconds(5000),
+    },
+  ): Promise<void> {
     if (this.shutdownPromise) {
       return this.shutdownPromise;
     }
@@ -215,6 +247,8 @@ export class MemoryRuntimeStore implements RuntimeStore {
     }
 
     this.state = RUNTIME_STATE.SHUTTING_DOWN;
+
+    this.shutdownController.abort(new RuntimeLifecycleError('Runtime shutting down'));
 
     try {
       if (this.inflightOperations > 0) {
