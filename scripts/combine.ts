@@ -46,10 +46,12 @@ const IGNORE_NAMES = new Set([
 const IGNORE_PATH_PREFIXES = [
   'libs', //
   'tooling', //
+  'legacy', //
   'test', //
   'packages/nestjs', //
-  // 'packages/runtime', //
-  'packages/contracts', //
+  'packages/runtime', //
+  'packages/runtime-memory', //
+  // 'packages/contracts', //
   // 'packages', //
   'playground', //
   'scripts',
