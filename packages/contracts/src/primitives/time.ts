@@ -31,3 +31,14 @@ export function parseCalendarDay(value: number): ParseResult<number> {
     value: value,
   };
 }
+
+export function parseAnchorDay(value: number): ParseResult<number> {
+  if (!Number.isInteger(value) || value < 1 || value > 28) {
+    return {
+      ok: false,
+      code: ParseErrorCode.InvalidCalendarDay,
+      error: 'anchor day must be between 1 and 28 to be safe across all months',
+    };
+  }
+  return { ok: true, value };
+}

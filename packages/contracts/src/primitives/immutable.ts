@@ -22,6 +22,6 @@ export type DeepReadonly<T> = T extends Primitive
 
 export type Immutable<T> = DeepReadonly<T>;
 
-export function immutable<T extends object>(value: T) {
+export function immutable<T extends object>(value: T): DeepReadonly<T> {
   return deepFreeze<T>(value);
 }

@@ -6,5 +6,6 @@ export const RateLimitEventDefinitions = deepFreeze(
   mapObjectValues(RateLimitEventRegistry, (definition) => ({
     severity: definition.severity,
     compatibility: definition.compatibility,
+    dataClassification: definition.dataClassification,
   })),
 );

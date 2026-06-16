@@ -68,6 +68,12 @@ importers:
 
   packages/contracts: {}
 
+  packages/core:
+    dependencies:
+      '@fluxguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   packages/nestjs:
     dependencies:
       '@fluxguard/contracts':

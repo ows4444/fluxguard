@@ -1,8 +1,5 @@
 export interface RateLimiterResetCommand {
-  readonly apiKeyId?: string;
-  readonly ruleId?: string;
-  readonly userId?: string;
-  readonly ip?: string;
+  readonly keyPrefix?: string;
 }
 
 export interface ResetResult {

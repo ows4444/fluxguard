@@ -7,7 +7,7 @@ export interface RateLimitEvaluation extends RateLimitEvaluationSnapshot {
 }
 
 export interface DegradedRateLimitEvaluation {
-  readonly source: 'replica' | 'cache' | 'fallback';
+  readonly source: 'primary' | 'replica' | 'cache' | 'fallback';
 
   readonly ruleId?: string;
 
@@ -45,6 +45,17 @@ export type RateLimitEnforcement =
     };
 
 export type RateLimitDecision =
+  | {
+      readonly type: 'policy_miss';
+    }
+  | {
+      readonly type: 'rule_miss';
+    }
+  | {
+      readonly diagnostics?: RateLimitDiagnostics;
+      readonly reason: BypassReason;
+      readonly type: 'bypass';
+    }
   | {
       readonly diagnostics?: RateLimitDiagnostics;
       readonly enforcement: Exclude<RateLimitEnforcement, { readonly type: 'degraded' }>;

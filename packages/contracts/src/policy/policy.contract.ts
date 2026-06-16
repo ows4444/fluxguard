@@ -1,36 +1,18 @@
 import type { RateLimitRequest } from '../runtime/runtime.contract';
+import type { RateLimitAlgorithmId } from './algorithm';
 import type { RateLimitMatcher, RateLimitScope } from './matcher.contract';
-
-export const Algorithm = Object.freeze({
-  FixedWindow: 'fixed-window',
-  SlidingWindowLog: 'sliding-window-log',
-  SlidingWindowCounter: 'sliding-window-counter',
-  TokenBucket: 'token-bucket',
-  LeakyBucket: 'leaky-bucket',
-  GCRA: 'gcra',
-} as const);
-
-export type RateLimitAlgorithmId = (typeof Algorithm)[keyof typeof Algorithm];
-
-export type RateLimitWindowUnit = 'second' | 'minute' | 'hour' | 'day';
-
-export interface CalendarMonthWindow {
-  readonly anchorDay?: number;
-  readonly timezone: string;
-  readonly type: 'calendar-month-window';
-}
-
-export interface RateLimitWindow {
-  readonly type: 'fixed-window';
-
-  readonly size: number;
-  readonly unit: RateLimitWindowUnit;
-}
-
-export type RateLimitWindowPolicy = RateLimitWindow | CalendarMonthWindow;
+import type { RateLimitWindowPolicy } from './window.types';
+export { Algorithm, type RateLimitAlgorithmId } from './algorithm';
+export { type RateLimitScope, Scope } from './matcher.contract';
+export {
+  type CalendarMonthWindow,
+  type RateLimitWindow,
+  type RateLimitWindowPolicy,
+  type RateLimitWindowUnit,
+} from './window.types';
 
 export interface RateLimitQuotaPolicy {
-  readonly burstLimit: number;
+  readonly burstLimit?: number;
   readonly limit: number;
   readonly refillRatePerSec?: number;
   readonly window: RateLimitWindowPolicy;
@@ -38,11 +20,19 @@ export interface RateLimitQuotaPolicy {
 
 export type RateLimitAction = 'reject' | 'throttle' | 'shadow';
 
+export const RULE_RESOLUTION = Object.freeze({
+  tieBreaker: 'rule-id-ascending',
+  winner: 'highest-priority',
+  shadowBehavior: 'always-observed-independent-of-priority',
+  multiMatch: 'single-winner',
+} as const);
+
 export interface RateLimitExecutionPolicy {
   readonly action: RateLimitAction;
   readonly algorithm: RateLimitAlgorithmId;
   readonly bypassable: boolean;
   readonly priority: number;
+  readonly shedProbability?: number;
 }
 
 export interface RateLimitObservabilityMetadata {

@@ -9,6 +9,14 @@ function validateRoute(value: string, kind: 'route template' | 'route pattern'):
     };
   }
 
+  if (value.includes('//')) {
+    return {
+      ok: false,
+      code: ParseErrorCode.RouteContainsDoubleSlash,
+      error: `${kind} must not contain consecutive slashes`,
+    };
+  }
+
   if (value.includes('?')) {
     return {
       ok: false,

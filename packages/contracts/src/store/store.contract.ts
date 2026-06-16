@@ -1,3 +1,4 @@
+import type { RateLimiterResetCommand, ResetResult } from '../runtime/reset.contract';
 import type { ConsumeCommand, ConsumeOutcome, PeekCommand, PeekOutcome } from './store.command';
 
 export type StoreHealthStatus = 'healthy' | 'degraded' | 'unavailable';
@@ -38,4 +39,6 @@ export interface IRateLimitStore {
   health(): Promise<StoreHealthReport>;
 
   peek(command: PeekCommand): Promise<PeekOutcome>;
+
+  reset(command: RateLimiterResetCommand): Promise<ResetResult>;
 }

@@ -2,6 +2,8 @@ import type { StoreFailure } from './store.failure';
 
 export type PeekConsistency = 'strong' | 'eventual';
 
+export type StoreConsumeMode = 'counter' | 'token-bucket';
+
 export interface ConsumeCommand {
   readonly key: string;
   readonly bucketCapacity?: number;
@@ -9,6 +11,7 @@ export interface ConsumeCommand {
   readonly idempotencyKey: string;
   readonly idempotencyTtlMs: number;
   readonly limit: number;
+  readonly mode: StoreConsumeMode;
   readonly nowMs: number;
   readonly refillRatePerSec?: number;
   readonly windowMs: number;
@@ -31,7 +34,6 @@ export interface PeekCommand {
   readonly key: string;
   readonly consistency: PeekConsistency;
   readonly nowMs: number;
-  readonly windowMs: number;
 }
 
 export interface PeekResult {
@@ -40,7 +42,6 @@ export interface PeekResult {
   readonly consistency: PeekConsistency;
   readonly exists: boolean;
   readonly fromReplica: boolean;
-  readonly limit: number;
   readonly remaining: number;
   readonly resetAtMs: number;
 }

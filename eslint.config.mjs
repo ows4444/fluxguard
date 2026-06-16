@@ -202,6 +202,8 @@ export default tseslint.config(
       '@typescript-eslint/unbound-method': 'off',
 
       'prettier/prettier': 'error',
+
+      '@typescript-eslint/require-await': 'off',
     },
   },
 );

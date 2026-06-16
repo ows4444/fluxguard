@@ -23,6 +23,7 @@ export const ParseErrorCode = Object.freeze({
   RouteContainsQuery: 'route_contains_query',
   RouteContainsFragment: 'route_contains_fragment',
   RouteContainsWhitespace: 'route_contains_whitespace',
+  RouteContainsDoubleSlash: 'route_contains_double_slash',
 
   PositiveIntegerRequired: 'positive_integer_required',
   NonNegativeIntegerRequired: 'non_negative_integer_required',

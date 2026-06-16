@@ -54,6 +54,8 @@ export type StoreFailure =
   | InvalidResponseStoreFailure
   | UnknownStoreFailure;
 
+const KNOWN_STORE_FAILURE_TYPES = new Set<string>(Object.values(StoreFailureType));
+
 export function isStoreFailure(value: unknown): value is StoreFailure {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -64,8 +66,17 @@ export function isStoreFailure(value: unknown): value is StoreFailure {
   return (
     candidate.ok === false &&
     typeof candidate.type === 'string' &&
+    KNOWN_STORE_FAILURE_TYPES.has(candidate.type) &&
     typeof candidate.occurredAtMs === 'number' &&
     typeof candidate.retryable === 'boolean' &&
-    typeof candidate.transient === 'boolean'
+    typeof candidate.transient === 'boolean' &&
+    (candidate.operation === undefined || candidate.operation === 'consume' || candidate.operation === 'peek') &&
+    (candidate.storeNode === undefined || typeof candidate.storeNode === 'string')
   );
+}
+
+export function isStoreSuccess<T extends { readonly ok: true } | { readonly ok: false }>(
+  value: T,
+): value is Extract<T, { readonly ok: true }> {
+  return value.ok === true;
 }

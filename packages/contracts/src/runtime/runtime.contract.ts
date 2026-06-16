@@ -1,6 +1,7 @@
 import type { PeekConsistency } from '../store/store.command';
 
 export interface Clock {
+  calendarWindowStartMs(timezone: string, anchorDay?: number): number;
   monotonicUs(): number;
   nowMs(): number;
   windowStartMs(windowMs: number): number;
@@ -11,6 +12,8 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 
 export type RequestMetadataKey = `x-${string}`;
 
 export type RequestMetadata = Readonly<Record<RequestMetadataKey, string>>;
+
+export const DEFAULT_REQUEST_COST = 1;
 
 export const REQUEST_METADATA_LIMITS = Object.freeze({
   maxEntries: 32,

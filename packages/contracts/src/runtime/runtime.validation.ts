@@ -14,11 +14,15 @@ export function validateRequestMetadata(metadata: RequestMetadata): boolean {
   }
 
   for (const [key, value] of entries) {
-    if (!key.startsWith('x-')) {
+    if (!key.startsWith('x-') || key.length < 3) {
       return false;
     }
 
     if (value.length === 0) {
+      return false;
+    }
+
+    if (/[\r\n]/u.test(value)) {
       return false;
     }
 

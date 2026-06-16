@@ -2,12 +2,18 @@ export type RateLimitEventSeverity = 'info' | 'warn' | 'critical';
 
 export type EventSchemaCompatibility = 'backward-compatible' | 'breaking';
 
-export interface EventDefinition {
-  readonly severity: RateLimitEventSeverity;
+export type EventDataClassification = 'public' | 'internal' | 'restricted';
 
+export interface EventDefinition {
   readonly compatibility: EventSchemaCompatibility;
+  readonly dataClassification: EventDataClassification;
+  readonly severity: RateLimitEventSeverity;
 }
 
 export interface EventRegistryEntry extends EventDefinition {
   readonly schemaVersion: number;
 }
+
+export type EventRegistry<TPayloadMap extends object> = {
+  readonly [K in keyof TPayloadMap]: EventRegistryEntry;
+};
