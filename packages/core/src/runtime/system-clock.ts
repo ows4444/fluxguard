@@ -16,6 +16,6 @@ export class SystemClock implements Clock {
   }
 
   calendarWindowStartMs(_timezone: string, _anchorDay?: number): number {
-    throw new Error('calendar-month-window not implemented');
+    throw new Error('calendar-month-window is defined by contract but not yet implemented');
   }
 }

@@ -19,6 +19,12 @@ export function createEnforcement(
   }
 
   if (result.allowed) {
+    if (result.burstConsumed) {
+      return {
+        type: 'allow_burst',
+        burstRemaining: result.burstRemaining ?? 0,
+      };
+    }
     return { type: 'allow' };
   }
 

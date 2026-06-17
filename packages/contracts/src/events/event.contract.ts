@@ -76,7 +76,17 @@ export interface RateLimitThrottledEventPayload extends BaseRateLimitEventPayloa
   readonly shedProbability: number;
 }
 
-export interface RateLimitBypassedEventPayload extends BaseRateLimitEventPayload {
+export interface RateLimitBypassedEventPayload {
+  readonly apiKeyId?: string;
+  readonly userId?: string;
+
+  readonly ip: string;
+  readonly method: HttpMethod;
+  readonly route: string;
+
+  readonly cost: number;
+  readonly evaluationDurationUs: number;
+
   readonly bypassReason: BypassReason;
 }
 

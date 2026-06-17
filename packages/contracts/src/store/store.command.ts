@@ -36,14 +36,23 @@ export interface PeekCommand {
   readonly nowMs: number;
 }
 
-export interface PeekResult {
-  readonly ok: true;
+export type PeekResult =
+  | {
+      readonly ok: true;
 
-  readonly consistency: PeekConsistency;
-  readonly exists: boolean;
-  readonly fromReplica: boolean;
-  readonly remaining: number;
-  readonly resetAtMs: number;
-}
+      readonly consistency: PeekConsistency;
+      readonly exists: false;
+      readonly fromReplica: boolean;
+    }
+  | {
+      readonly ok: true;
+
+      readonly consistency: PeekConsistency;
+      readonly exists: true;
+      readonly fromReplica: boolean;
+
+      readonly remaining: number;
+      readonly resetAtMs: number;
+    };
 
 export type PeekOutcome = PeekResult | StoreFailure;

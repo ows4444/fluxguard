@@ -1,15 +1,18 @@
-import type {
-  ConsumeCommand,
-  ConsumeOutcome,
-  ConsumeResult,
-  IRateLimitStore,
-  PeekCommand,
-  PeekOutcome,
-  RateLimiterResetCommand,
-  RateLimitStoreCapabilities,
-  ResetResult,
-  StoreHealthReport,
+import {
+  assertNever,
+  type ConsumeCommand,
+  type ConsumeOutcome,
+  type ConsumeResult,
+  type IRateLimitStore,
+  type PeekCommand,
+  type PeekOutcome,
+  type RateLimiterResetCommand,
+  type RateLimitStoreCapabilities,
+  type ResetResult,
+  type StoreHealthReport,
 } from '@fluxguard/contracts';
+
+const MAX_SWEEP_ENTRIES = 100;
 
 interface CounterState {
   count: number;
@@ -30,23 +33,29 @@ export class MemoryStore implements IRateLimitStore {
   private operations = 0;
 
   private sweepExpired(nowMs: number): void {
-    this.operations++;
+    this.operations = (this.operations + 1) % 1_000_000;
 
     if (this.operations % 1000 !== 0) {
       return;
     }
 
-    const expiredCounters: string[] = [];
+    let swept = 0;
     for (const [key, value] of this.counters.entries()) {
-      if (value.resetAtMs <= nowMs) expiredCounters.push(key);
+      if (swept >= MAX_SWEEP_ENTRIES) break;
+      if (value.resetAtMs <= nowMs) {
+        this.counters.delete(key);
+        swept++;
+      }
     }
-    for (const key of expiredCounters) this.counters.delete(key);
 
-    const expiredIdempotency: string[] = [];
+    swept = 0;
     for (const [key, value] of this.idempotencyCache.entries()) {
-      if (value.expiresAtMs <= nowMs) expiredIdempotency.push(key);
+      if (swept >= MAX_SWEEP_ENTRIES) break;
+      if (value.expiresAtMs <= nowMs) {
+        this.idempotencyCache.delete(key);
+        swept++;
+      }
     }
-    for (const key of expiredIdempotency) this.idempotencyCache.delete(key);
   }
 
   capabilities(): RateLimitStoreCapabilities {
@@ -62,9 +71,19 @@ export class MemoryStore implements IRateLimitStore {
 
   async consume(command: ConsumeCommand): Promise<ConsumeOutcome> {
     this.sweepExpired(command.nowMs);
-    const cached = this.idempotencyCache.get(command.idempotencyKey);
-    if (cached && cached.expiresAtMs > command.nowMs) {
-      return { ...cached.result, fromIdempotencyCache: true };
+
+    switch (command.mode) {
+      case 'counter':
+        break;
+
+      case 'token-bucket':
+        throw new Error(
+          'MemoryStore does not implement token-bucket mode. ' +
+            'Use a store that supports token-bucket semantics (e.g. RedisStore).',
+        );
+
+      default:
+        return assertNever(command.mode);
     }
 
     let state = this.counters.get(command.key);
@@ -73,6 +92,12 @@ export class MemoryStore implements IRateLimitStore {
       state = { count: 0, limit: command.limit, resetAtMs: command.nowMs + command.windowMs };
     } else if (state.limit !== command.limit) {
       state = { count: 0, limit: command.limit, resetAtMs: command.nowMs + command.windowMs };
+    }
+
+    const cacheKey = `${command.key}:${command.idempotencyKey}`;
+    const cached = this.idempotencyCache.get(cacheKey);
+    if (cached && cached.expiresAtMs > command.nowMs) {
+      return { ...cached.result, fromIdempotencyCache: true };
     }
 
     const nextCount = state.count + command.cost;
@@ -94,17 +119,16 @@ export class MemoryStore implements IRateLimitStore {
       resetAtMs: state.resetAtMs,
     };
 
-    if (allowed) {
-      this.idempotencyCache.set(command.idempotencyKey, {
-        expiresAtMs: command.nowMs + command.idempotencyTtlMs,
-        result,
-      });
-    }
+    this.idempotencyCache.set(cacheKey, {
+      expiresAtMs: command.nowMs + command.idempotencyTtlMs,
+      result,
+    });
 
     return result;
   }
 
   async peek(command: PeekCommand): Promise<PeekOutcome> {
+    this.sweepExpired(command.nowMs);
     const state = this.counters.get(command.key);
 
     if (!state || state.resetAtMs <= command.nowMs) {
@@ -113,8 +137,6 @@ export class MemoryStore implements IRateLimitStore {
         consistency: command.consistency,
         exists: false,
         fromReplica: false,
-        remaining: 0,
-        resetAtMs: 0,
       };
     }
 
@@ -146,6 +168,7 @@ export class MemoryStore implements IRateLimitStore {
       const deletedCount = this.counters.size;
 
       this.counters.clear();
+      this.idempotencyCache.clear();
 
       return {
         deletedCount,
@@ -156,11 +179,25 @@ export class MemoryStore implements IRateLimitStore {
 
     const toDelete: string[] = [];
     for (const key of this.counters.keys()) {
-      if (key.startsWith(command.keyPrefix)) toDelete.push(key);
+      if (key === command.keyPrefix || key.startsWith(`${command.keyPrefix}:`)) {
+        toDelete.push(key);
+      }
     }
     for (const key of toDelete) {
       this.counters.delete(key);
       deletedCount++;
+    }
+
+    const idempotencyKeysToDelete: string[] = [];
+
+    for (const cacheKey of this.idempotencyCache.keys()) {
+      if (cacheKey === command.keyPrefix || cacheKey.startsWith(`${command.keyPrefix}:`)) {
+        idempotencyKeysToDelete.push(cacheKey);
+      }
+    }
+
+    for (const cacheKey of idempotencyKeysToDelete) {
+      this.idempotencyCache.delete(cacheKey);
     }
 
     return {

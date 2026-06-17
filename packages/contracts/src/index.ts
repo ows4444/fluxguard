@@ -29,6 +29,7 @@ export * from './primitives/route';
 export * from './primitives/time';
 export * from './primitives/time.helpers';
 export * from './runtime/diagnostics.contract';
+export * from './runtime/request.error';
 export * from './runtime/request.validation';
 export * from './runtime/reset.contract';
 export * from './runtime/runtime.contract';

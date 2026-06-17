@@ -61,7 +61,7 @@ export const RateLimitEventRegistry = deepFreeze({
   },
   'rate_limit.reset': {
     schemaVersion: 1,
-    severity: 'warn',
+    severity: 'info',
     compatibility: 'backward-compatible',
     dataClassification: 'internal',
   },

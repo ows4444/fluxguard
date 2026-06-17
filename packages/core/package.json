@@ -20,7 +20,8 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@fluxguard/contracts": "workspace:*"
+    "@fluxguard/contracts": "workspace:*",
+    "ipaddr.js": "^2.4.0"
   },
   "scripts": {
     "build": "pnpm typecheck && tsup",

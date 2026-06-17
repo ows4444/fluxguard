@@ -98,3 +98,7 @@ export interface RuntimeCompatibilityError {
   readonly ruleId?: string;
   readonly message: string;
 }
+
+export interface RuntimeCompatibilityValidator {
+  validate(policy: RateLimitPolicy): ReadonlyArray<RuntimeCompatibilityError>;
+}

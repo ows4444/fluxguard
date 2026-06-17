@@ -7,7 +7,6 @@ import {
   type PolicyValidationError,
   type PolicyValidationResult,
   type RateLimitPolicy,
-  supportsWindowPolicy,
 } from '@fluxguard/contracts';
 
 export class PolicyValidator implements IPolicyValidator {
@@ -31,13 +30,6 @@ export class PolicyValidator implements IPolicyValidator {
     }
 
     const ids = new Set<string>();
-
-    if ((policy.bypass?.exemptCidrs?.length ?? 0) > POLICY_VALIDATION_LIMITS.maxExemptCidrs) {
-      errors.push({
-        path: ['bypass', 'exemptCidrs'],
-        message: 'max exempt cidrs exceeded',
-      });
-    }
 
     if ((policy.bypass?.exemptCidrs?.length ?? 0) > POLICY_VALIDATION_LIMITS.maxExemptCidrs) {
       errors.push({
@@ -75,7 +67,7 @@ export class PolicyValidator implements IPolicyValidator {
       }
 
       const sp = rule.execution.shedProbability;
- 
+
       if (rule.execution.action !== 'throttle' && sp !== undefined) {
         errors.push({
           path: ['rules', rule.id, 'execution', 'shedProbability'],
@@ -88,6 +80,7 @@ export class PolicyValidator implements IPolicyValidator {
             message: 'shedProbability must be a finite number in [0, 1]',
           });
         }
+      }
 
       if (isFixedWindow(rule.quota.window)) {
         if (rule.quota.window.size <= 0) {
@@ -129,6 +122,17 @@ export class PolicyValidator implements IPolicyValidator {
           path: ['rules', rule.id, 'match', 'routePatterns'],
           message: 'max route patterns exceeded',
         });
+      } else if (rule.match.routePatterns && rule.match.routePatterns.length > 0) {
+        const seen = new Set<string>();
+        for (const pattern of rule.match.routePatterns) {
+          if (seen.has(pattern)) {
+            errors.push({
+              path: ['rules', rule.id, 'match', 'routePatterns'],
+              message: `duplicate route pattern: "${pattern}"`,
+            });
+          }
+          seen.add(pattern);
+        }
       }
 
       if ((rule.meta?.tags?.length ?? 0) > POLICY_VALIDATION_LIMITS.maxTagsPerRule) {
@@ -154,10 +158,31 @@ export class PolicyValidator implements IPolicyValidator {
         });
       }
 
-      if (!supportsWindowPolicy(rule.execution.algorithm, rule.quota.window)) {
+      if (rule.quota.burstLimit !== undefined && rule.quota.burstLimit <= 0) {
         errors.push({
-          path: ['rules', rule.id],
-          message: 'unsupported window policy',
+          path: ['rules', rule.id, 'quota', 'burstLimit'],
+          message: 'burstLimit must be > 0',
+        });
+      }
+
+      if (
+        rule.quota.burstLimit !== undefined &&
+        rule.quota.limit !== undefined &&
+        rule.quota.burstLimit < rule.quota.limit
+      ) {
+        errors.push({
+          path: ['rules', rule.id, 'quota', 'burstLimit'],
+          message: 'burstLimit must be >= limit',
+        });
+      }
+
+      if (
+        rule.quota.refillRatePerSec !== undefined &&
+        (!Number.isFinite(rule.quota.refillRatePerSec) || rule.quota.refillRatePerSec <= 0)
+      ) {
+        errors.push({
+          path: ['rules', rule.id, 'quota', 'refillRatePerSec'],
+          message: 'refillRatePerSec must be a finite number > 0',
         });
       }
 

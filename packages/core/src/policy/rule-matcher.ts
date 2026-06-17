@@ -9,6 +9,10 @@ function matchPattern(pattern: string, route: string): boolean {
   for (let i = 0; i < patternSegments.length; i++) {
     const p = patternSegments[i];
 
+    if (p === undefined) {
+      return false;
+    }
+
     if (p === '*') {
       return i === patternSegments.length - 1;
     }
