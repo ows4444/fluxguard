@@ -1,30 +1,46 @@
 import type { RateLimitRequest, RateLimitRule } from '@fluxguard/contracts';
 
 function matchPattern(pattern: string, route: string): boolean {
-  if (pattern === route) return true;
+  if (pattern.endsWith('/**')) {
+    const prefix = pattern.slice(0, -3);
+
+    return route === prefix || route.startsWith(`${prefix}/`);
+  }
+
+  if (pattern === route) {
+    return true;
+  }
 
   const patternSegments = pattern.split('/');
   const routeSegments = route.split('/');
 
-  for (let i = 0; i < patternSegments.length; i++) {
-    const p = patternSegments[i];
+  let i = 0;
 
-    if (p === undefined) {
+  while (i < patternSegments.length) {
+    const patternSegment = patternSegments[i];
+
+    if (patternSegment === undefined) {
       return false;
     }
 
-    if (p === '*') {
+    if (patternSegment === '**') {
       return i === patternSegments.length - 1;
     }
 
-    if (i >= routeSegments.length) return false;
+    const routeSegment = routeSegments[i];
 
-    if (p !== routeSegments[i] && !p.startsWith(':')) {
+    if (routeSegment === undefined) {
       return false;
     }
+
+    if (patternSegment !== routeSegment && !patternSegment.startsWith(':')) {
+      return false;
+    }
+
+    i++;
   }
 
-  return patternSegments.length === routeSegments.length;
+  return i === routeSegments.length;
 }
 
 export class RuleMatcher {

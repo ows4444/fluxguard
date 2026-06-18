@@ -1,8 +1,8 @@
 import {
   assertNever,
   calculateRetryAfterMs,
-  type RateLimitEnforcement,
   type RateLimitRule,
+  type SuccessfulRateLimitEnforcement,
 } from '@fluxguard/contracts';
 
 import type { AlgorithmResult } from '../algorithms/algorithm.contract';
@@ -13,7 +13,7 @@ export function createEnforcement(
   rule: RateLimitRule,
   result: AlgorithmResult,
   nowMs: number,
-): Exclude<RateLimitEnforcement, { readonly type: 'degraded' }> {
+): SuccessfulRateLimitEnforcement {
   if (rule.execution.action === 'shadow') {
     return { type: 'shadow' };
   }

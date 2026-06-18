@@ -1,5 +1,6 @@
 export * from './algorithms/algorithm.contract';
 export * from './algorithms/algorithm.registry';
+export * from './algorithms/base.algorithm';
 export * from './algorithms/fixed-window.algorithm';
 export { BypassChecker, type BypassMatch } from './bypass/bypass-checker';
 export { BYPASS_TOKEN_META_KEY } from './constants/bypass.constants';

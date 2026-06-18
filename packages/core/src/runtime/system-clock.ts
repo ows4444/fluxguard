@@ -1,6 +1,12 @@
 import type { Clock } from '@fluxguard/contracts';
 
 export class SystemClock implements Clock {
+  capabilities() {
+    return {
+      supportsCalendarMonthWindow: false,
+    } as const;
+  }
+
   nowMs(): number {
     return Date.now();
   }
@@ -16,6 +22,10 @@ export class SystemClock implements Clock {
   }
 
   calendarWindowStartMs(_timezone: string, _anchorDay?: number): number {
-    throw new Error('calendar-month-window is defined by contract but not yet implemented');
+    throw new Error('calendar-month-window is not supported by the current runtime');
+  }
+
+  calendarWindowResetAtMs(_timezone: string, _anchorDay?: number): number {
+    throw new Error('calendar-month-window is not supported by the current runtime');
   }
 }

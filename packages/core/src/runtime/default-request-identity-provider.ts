@@ -5,22 +5,20 @@ import { DEFAULT_REQUEST_COST, type RateLimitRequest } from '@fluxguard/contract
 import type { RequestIdentityProvider } from './request-identity-provider';
 
 export class DefaultRequestIdentityProvider implements RequestIdentityProvider {
-  create(request: RateLimitRequest, rateLimitKey: string): string {
-    const sortedMeta = request.meta
-      ? Object.fromEntries(Object.entries(request.meta).sort(([a], [b]) => a.localeCompare(b)))
-      : undefined;
+  create(request: RateLimitRequest, rateLimitKey: string, ruleId?: string): string | undefined {
+    if (request.idempotencyKey === undefined) {
+      return undefined;
+    }
 
     return createHash('sha256')
       .update(
         JSON.stringify({
+          ruleId,
           rateLimitKey,
-          apiKeyId: request.apiKeyId,
-          userId: request.userId,
-          ip: request.ip,
+          idempotencyKey: request.idempotencyKey,
           route: request.route,
           method: request.method,
           cost: request.cost ?? DEFAULT_REQUEST_COST,
-          meta: sortedMeta,
         }),
       )
       .digest('hex');

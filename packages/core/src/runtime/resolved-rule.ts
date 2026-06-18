@@ -11,4 +11,8 @@ export interface ResolvedRuleContext {
 export type RuleResolutionResult =
   | { readonly type: 'policy_miss' }
   | { readonly type: 'rule_miss' }
+  | {
+      readonly shadows: readonly RateLimitRule[];
+      readonly type: 'shadow_only';
+    }
   | { readonly context: ResolvedRuleContext; readonly type: 'resolved' };

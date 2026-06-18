@@ -7,27 +7,35 @@ import {
 } from '@fluxguard/contracts';
 
 import type { EvaluationContext } from '../runtime/evaluation-context';
-import type { AlgorithmResult, RateLimitAlgorithm } from './algorithm.contract';
+import type { AlgorithmResult } from './algorithm.contract';
+import { UnsupportedAlgorithmWindowError } from './algorithm-registry.errors';
+import { BaseRateLimitAlgorithm } from './base.algorithm';
 
-export class FixedWindowAlgorithm implements RateLimitAlgorithm {
+export class FixedWindowAlgorithm extends BaseRateLimitAlgorithm {
+  override readonly supportsShadowEvaluation = true;
   async evaluate(context: EvaluationContext): Promise<AlgorithmResult> {
     const window = context.rule.quota.window;
 
     if (!isFixedWindow(window)) {
-      throw new Error('FixedWindowAlgorithm requires fixed-window policy');
+      throw new UnsupportedAlgorithmWindowError(context.rule.id, window.type, 'fixed-window');
     }
 
     const windowMs = windowToMs(window);
 
+    const windowStart = context.clock.windowStartMs(windowMs);
+
     const command: ConsumeCommand = {
       key: context.key,
       cost: context.request.cost ?? DEFAULT_REQUEST_COST,
-      idempotencyKey: context.idempotencyKey,
-      idempotencyTtlMs: windowMs,
+
       limit: context.rule.quota.limit,
       mode: 'counter',
       nowMs: context.clock.nowMs(),
       windowMs,
+      resetAtMs: windowStart + windowMs,
+      ...(context.idempotencyKey !== undefined
+        ? { idempotencyKey: context.idempotencyKey, idempotencyTtlMs: windowMs }
+        : {}),
     };
 
     const result = await context.store.consume(command);

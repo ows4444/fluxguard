@@ -1,7 +1,7 @@
 import type { Clock, IRateLimitStore, RateLimitRequest, RateLimitRule } from '@fluxguard/contracts';
 
 export interface EvaluationContext {
-  readonly idempotencyKey: string;
+  readonly idempotencyKey?: string;
 
   readonly clock: Clock;
 

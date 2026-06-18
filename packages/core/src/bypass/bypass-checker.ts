@@ -13,34 +13,24 @@ export interface BypassMatch {
   readonly reason: BypassReason;
 }
 
+export interface BypassCheckDiagnostics {
+  onCidrEvaluationError?(cidr: string, error: unknown): void;
+}
+
 export class BypassChecker {
-  private static readonly MAX_CACHE_ENTRIES = 1000;
-  private readonly exemptUserCache = new Map<string, ReadonlySet<string>>();
+  private readonly exemptUserSetByPolicy = new WeakMap<RateLimitBypassPolicy, ReadonlySet<string>>();
+  constructor(private readonly diagnostics: BypassCheckDiagnostics = {}) {}
 
-  private getExemptUserSet(
-    policyId: string,
-    policyVersion: number | undefined,
-    ids: ReadonlyArray<string>,
-  ): ReadonlySet<string> {
-    const cacheKey = `${policyId}|v=${policyVersion ?? 'none'}|count=${ids.length}`;
-
-    const cached = this.exemptUserCache.get(cacheKey);
+  private getExemptUserSet(bypass: RateLimitBypassPolicy): ReadonlySet<string> {
+    const cached = this.exemptUserSetByPolicy.get(bypass);
 
     if (cached) {
       return cached;
     }
 
-    if (this.exemptUserCache.size >= BypassChecker.MAX_CACHE_ENTRIES) {
-      const oldest = this.exemptUserCache.keys().next().value;
+    const set = new Set(bypass.exemptUserIds ?? []);
 
-      if (oldest !== undefined) {
-        this.exemptUserCache.delete(oldest);
-      }
-    }
-
-    const set = new Set(ids);
-
-    this.exemptUserCache.set(cacheKey, set);
+    this.exemptUserSetByPolicy.set(bypass, set);
 
     return set;
   }
@@ -49,12 +39,10 @@ export class BypassChecker {
     bypass: RateLimitBypassPolicy,
     request: RateLimitRequest,
     tokenVerifier?: IBypassTokenVerifier,
-    policyId?: string,
-    policyVersion?: number,
     ruleScope?: RateLimitRule['match']['scope'],
   ): Promise<BypassMatch | null> {
     if (bypass.exemptUserIds && request.userId) {
-      const exemptSet = this.getExemptUserSet(policyId ?? '', policyVersion, bypass.exemptUserIds);
+      const exemptSet = this.getExemptUserSet(bypass);
       if (exemptSet.has(request.userId)) {
         return { reason: 'exempt-user' };
       }
@@ -66,10 +54,11 @@ export class BypassChecker {
           if (isInCidr(request.ip, cidr)) {
             return { reason: 'exempt-cidr' };
           }
-        } catch {
-          // CIDR matching implementation unavailable.
-          // Ignore CIDR bypass evaluation rather than
-          // failing the entire rate-limit request.
+        } catch (error) {
+          this.diagnostics.onCidrEvaluationError?.(cidr, error);
+          // Malformed CIDR should have been rejected by PolicyValidator,
+          // but defend in depth: skip this entry rather than failing
+          // the whole request, while still surfacing the failure.
         }
       }
     }

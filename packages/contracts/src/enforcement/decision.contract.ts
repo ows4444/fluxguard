@@ -44,6 +44,15 @@ export type RateLimitEnforcement =
       readonly type: 'degraded';
     };
 
+export type SuccessfulRateLimitEnforcement = Extract<
+  RateLimitEnforcement,
+  | { readonly type: 'allow' }
+  | { readonly type: 'allow_burst' }
+  | { readonly type: 'reject' }
+  | { readonly type: 'throttle' }
+  | { readonly type: 'shadow' }
+>;
+
 export type RateLimitDecision =
   | {
       readonly type: 'policy_miss';
@@ -52,13 +61,16 @@ export type RateLimitDecision =
       readonly type: 'rule_miss';
     }
   | {
+      readonly type: 'shadow_only';
+    }
+  | {
       readonly diagnostics?: RateLimitDiagnostics;
       readonly reason: BypassReason;
       readonly type: 'bypass';
     }
   | {
       readonly diagnostics?: RateLimitDiagnostics;
-      readonly enforcement: Exclude<RateLimitEnforcement, { readonly type: 'degraded' }>;
+      readonly enforcement: SuccessfulRateLimitEnforcement;
       readonly evaluation: RateLimitEvaluation;
       readonly type: 'success';
     }

@@ -45,17 +45,15 @@ export const RateLimitEventRegistry = deepFreeze({
     compatibility: 'backward-compatible',
     dataClassification: 'restricted',
   },
-
-  'rate_limit.rule_miss': {
+  'rate_limit.policy_miss': {
     schemaVersion: 1,
     severity: 'info',
     compatibility: 'backward-compatible',
     dataClassification: 'internal',
   },
-
-  'rate_limit.store_timeout': {
+  'rate_limit.rule_miss': {
     schemaVersion: 1,
-    severity: 'warn',
+    severity: 'info',
     compatibility: 'backward-compatible',
     dataClassification: 'internal',
   },

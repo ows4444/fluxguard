@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type {
   Clock,
   EventPublisher,
@@ -7,6 +9,7 @@ import type {
   PeekConsistency,
   RateLimitDecision,
   RateLimiterResetCommand,
+  RateLimitEvent,
   RateLimitPolicy,
   RateLimitRequest,
   RateLimitRule,
@@ -14,7 +17,15 @@ import type {
   ResetResult,
 } from '@fluxguard/contracts';
 import type { PeekCommand } from '@fluxguard/contracts';
-import { InvalidRateLimitRequestError, StoreFailureError, validateRequest } from '@fluxguard/contracts';
+import {
+  InvalidRateLimitRequestError,
+  isCalendarMonthWindow,
+  isFixedWindow,
+  RATE_LIMIT_EVENT_SCHEMA_VERSION,
+  StoreFailureError,
+  validateRequest,
+  windowToMs,
+} from '@fluxguard/contracts';
 
 import type { AlgorithmRegistry } from './algorithms/algorithm.registry';
 import { BypassChecker } from './bypass/bypass-checker';
@@ -24,9 +35,12 @@ import type { KeyBuilder } from './keys/key-builder';
 import type { RuleMatcher } from './policy/rule-matcher';
 import { type RuleSelection, RuleSelector } from './policy/rule-selector';
 import type { DegradationPolicy } from './runtime/degradation-policy';
+import { type ErrorReporter, NoopErrorReporter } from './runtime/error-reporter';
 import { createEvaluationSnapshot } from './runtime/evaluation-snapshot';
 import type { RequestIdentityProvider } from './runtime/request-identity-provider';
 import type { RuleResolutionResult } from './runtime/resolved-rule';
+import { AlwaysEvaluateShadowPolicy, type ShadowEvaluationPolicy } from './runtime/shadow-evaluation-policy';
+import { ShadowRuleEvaluationError } from './runtime/shadow-rule-error';
 
 const MAX_CONCURRENT_SHADOW_RULES = 10;
 
@@ -39,6 +53,10 @@ export interface EventPublisherConfig {
 }
 
 export interface RateLimiterOptions {
+  readonly shadowEvaluationPolicy?: ShadowEvaluationPolicy;
+
+  readonly errorReporter?: ErrorReporter;
+
   readonly algorithmRegistry: AlgorithmRegistry;
 
   readonly requestIdentityProvider: RequestIdentityProvider;
@@ -66,8 +84,20 @@ export interface RateLimiterOptions {
 
 export class RateLimiter {
   private readonly bypassChecker: BypassChecker;
+  private readonly errorReporter: ErrorReporter;
+  private readonly shadowEvaluationPolicy: ShadowEvaluationPolicy;
+
   constructor(private readonly options: RateLimiterOptions) {
-    this.bypassChecker = options.bypassChecker ?? new BypassChecker();
+    this.errorReporter = options.errorReporter ?? new NoopErrorReporter();
+    this.bypassChecker =
+      options.bypassChecker ??
+      new BypassChecker({
+        onCidrEvaluationError: (cidr, error) =>
+          this.errorReporter.report(
+            new Error(`Invalid exempt CIDR "${cidr}" encountered at runtime`, { cause: error }),
+          ),
+      });
+    this.shadowEvaluationPolicy = options.shadowEvaluationPolicy ?? new AlwaysEvaluateShadowPolicy();
   }
 
   private async resolveRule(request: RateLimitRequest): Promise<{
@@ -94,12 +124,13 @@ export class RateLimiter {
     });
   }
 
-  protected onDetachedFailure(_error: unknown): void {
-    // intentionally empty
+  protected onDetachedFailure(error: unknown): void {
+    this.errorReporter.report(error);
   }
 
   private async evaluateShadowRules(request: RateLimitRequest, shadows: readonly RateLimitRule[]): Promise<void> {
-    const budgetedShadows = [...shadows]
+    const budgetedShadows = shadows
+      .slice()
       .sort((a, b) => b.execution.priority - a.execution.priority)
       .slice(0, MAX_CONCURRENT_SHADOW_RULES);
     const results = await Promise.allSettled(
@@ -108,21 +139,31 @@ export class RateLimiter {
 
         const key = this.options.keyBuilder.build(request, rule);
 
-        await algorithm.evaluate({
+        if (!algorithm.supportsShadowEvaluation) {
+          return;
+        }
+
+        await algorithm.evaluateShadow({
           key,
           rule,
           request,
           clock: this.options.clock,
-          store: this.options.store,
-          idempotencyKey: this.options.requestIdentityProvider.create(request, key, rule.id),
           startedAtUs: this.options.clock.monotonicUs(),
         });
       }),
     );
 
-    for (const result of results) {
+    for (const [index, result] of results.entries()) {
       if (result.status === 'rejected') {
-        this.onDetachedFailure(result.reason);
+        this.onDetachedFailure(
+          new ShadowRuleEvaluationError(
+            budgetedShadows[index]!.id,
+            budgetedShadows[index]!.execution.algorithm,
+            request.route,
+            request.method,
+            result.reason,
+          ),
+        );
       }
     }
   }
@@ -147,6 +188,13 @@ export class RateLimiter {
       return { type: 'rule_miss' };
     }
 
+    if (selection.type === 'shadow_only') {
+      return {
+        type: 'shadow_only',
+        shadows: selection.shadows,
+      };
+    }
+
     const key = this.options.keyBuilder.build(request, selection.winner);
 
     return {
@@ -168,11 +216,31 @@ export class RateLimiter {
     const resolved = await this.resolveRuleContext(request);
 
     switch (resolved.type) {
-      case 'policy_miss':
-        return { type: 'policy_miss' };
+      case 'policy_miss': {
+        const decision: RateLimitDecision = { type: 'policy_miss' };
+        this.publishDecision(decision, request);
+        return decision;
+      }
 
-      case 'rule_miss':
-        return { type: 'rule_miss' };
+      case 'rule_miss': {
+        const decision: RateLimitDecision = { type: 'rule_miss' };
+        this.publishDecision(decision, request);
+        return decision;
+      }
+
+      case 'shadow_only': {
+        if (this.shadowEvaluationPolicy.shouldEvaluate()) {
+          this.runDetached(this.evaluateShadowRules(request, resolved.shadows));
+        }
+
+        const decision: RateLimitDecision = {
+          type: 'shadow_only',
+        };
+
+        this.publishDecision(decision, request);
+
+        return decision;
+      }
 
       case 'resolved':
         break;
@@ -185,32 +253,37 @@ export class RateLimiter {
         policy.bypass,
         request,
         this.options.bypassTokenVerifier,
-        policy.id,
-        policy.version,
         rule.match.scope,
       );
       if (bypass) {
-        return {
+        const decision: RateLimitDecision = {
           type: 'bypass',
           reason: bypass.reason,
           diagnostics: { totalEvaluationDurationUs: this.options.clock.monotonicUs() - startedAtUs },
         };
+
+        this.publishDecision(decision, request);
+        return decision;
       }
     }
 
-    this.runDetached(this.evaluateShadowRules(request, shadows));
+    if (this.shadowEvaluationPolicy.shouldEvaluate()) {
+      this.runDetached(this.evaluateShadowRules(request, shadows));
+    }
 
     const algorithm = this.options.algorithmRegistry.get(rule.execution.algorithm);
 
     try {
+      const idempotencyKey = this.options.requestIdentityProvider.create(request, key, rule.id);
+
       const result = await algorithm.evaluate({
         key,
         rule,
         request,
         clock: this.options.clock,
         store: this.options.store,
-        idempotencyKey: this.options.requestIdentityProvider.create(request, key, rule.id),
         startedAtUs,
+        ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
       });
 
       const totalEvaluationDurationUs = this.options.clock.monotonicUs() - startedAtUs;
@@ -260,7 +333,7 @@ export class RateLimiter {
 
     const resolved = await this.resolveRuleContext(request);
 
-    if (resolved.type === 'policy_miss' || resolved.type === 'rule_miss') {
+    if (resolved.type === 'policy_miss' || resolved.type === 'rule_miss' || resolved.type === 'shadow_only') {
       return null;
     }
 
@@ -281,11 +354,22 @@ export class RateLimiter {
     }
 
     if (!result.exists) {
+      let resetAtMs = nowMs;
+
+      if (isFixedWindow(rule.quota.window)) {
+        const windowMs = windowToMs(rule.quota.window);
+        const windowStartMs = this.options.clock.windowStartMs(windowMs);
+
+        resetAtMs = windowStartMs + windowMs;
+      } else if (isCalendarMonthWindow(rule.quota.window)) {
+        resetAtMs = this.options.clock.calendarWindowResetAtMs(rule.quota.window.timezone, rule.quota.window.anchorDay);
+      }
+
       return {
         consistency: result.consistency,
         limit: rule.quota.limit,
         remaining: rule.quota.limit,
-        resetAtMs: nowMs,
+        ...(resetAtMs !== undefined ? { resetAtMs } : {}),
       };
     }
 
@@ -298,7 +382,30 @@ export class RateLimiter {
   }
 
   async reset(command: RateLimiterResetCommand): Promise<ResetResult> {
-    return this.options.store.reset(command);
+    const result = await this.options.store.reset(command);
+    this.publishResetEvent(result);
+    return result;
+  }
+
+  private publishResetEvent(result: ResetResult): void {
+    if (!this.options.eventPublisher) {
+      return;
+    }
+
+    const cfg = this.options.eventPublisher;
+    const event: RateLimitEvent = {
+      id: randomUUID(),
+      type: 'rate_limit.reset',
+      producer: cfg.producer,
+      producerVersion: cfg.producerVersion,
+      occurredAtMs: this.options.clock.nowMs(),
+      schemaVersion: RATE_LIMIT_EVENT_SCHEMA_VERSION['rate_limit.reset'],
+      ...(cfg.environment ? { environment: cfg.environment } : {}),
+      ...(cfg.region ? { region: cfg.region } : {}),
+      payload: { deletedKeys: result.deletedCount },
+    };
+
+    this.runDetached(cfg.publisher.publish(event));
   }
 
   private publishDecision(decision: RateLimitDecision, request: RateLimitRequest): void {
@@ -306,7 +413,14 @@ export class RateLimiter {
       return;
     }
 
-    const event = createDecisionEvent(decision, request, this.options.eventPublisher, this.options.clock);
+    const event = createDecisionEvent(
+      decision,
+      request,
+      this.options.eventPublisher,
+      this.options.clock,
+      request.tracing,
+      this.options.clock.nowMs(),
+    );
 
     if (event) {
       this.runDetached(this.options.eventPublisher.publisher.publish(event));

@@ -61,6 +61,7 @@ export class MemoryStore implements IRateLimitStore {
   capabilities(): RateLimitStoreCapabilities {
     return {
       consistency: 'strong',
+      supportedModes: ['counter'],
       consistentPeek: true,
       durability: 'memory-only',
       expectedLatencyMs: 0,
@@ -89,15 +90,32 @@ export class MemoryStore implements IRateLimitStore {
     let state = this.counters.get(command.key);
 
     if (!state || state.resetAtMs <= command.nowMs) {
-      state = { count: 0, limit: command.limit, resetAtMs: command.nowMs + command.windowMs };
+      state = {
+        count: 0,
+        limit: command.limit,
+        resetAtMs: command.resetAtMs ?? command.nowMs + command.windowMs,
+      };
     } else if (state.limit !== command.limit) {
-      state = { count: 0, limit: command.limit, resetAtMs: command.nowMs + command.windowMs };
+      state = {
+        count: 0,
+        limit: command.limit,
+        resetAtMs: command.resetAtMs ?? command.nowMs + command.windowMs,
+      };
     }
 
-    const cacheKey = `${command.key}:${command.idempotencyKey}`;
-    const cached = this.idempotencyCache.get(cacheKey);
-    if (cached && cached.expiresAtMs > command.nowMs) {
-      return { ...cached.result, fromIdempotencyCache: true };
+    let cacheKey: string | undefined;
+
+    if (command.idempotencyKey !== undefined) {
+      cacheKey = `${command.key}:${command.idempotencyKey}`;
+
+      const cached = this.idempotencyCache.get(cacheKey);
+
+      if (cached && cached.expiresAtMs > command.nowMs) {
+        return {
+          ...cached.result,
+          fromIdempotencyCache: true,
+        };
+      }
     }
 
     const nextCount = state.count + command.cost;
@@ -119,10 +137,12 @@ export class MemoryStore implements IRateLimitStore {
       resetAtMs: state.resetAtMs,
     };
 
-    this.idempotencyCache.set(cacheKey, {
-      expiresAtMs: command.nowMs + command.idempotencyTtlMs,
-      result,
-    });
+    if (cacheKey !== undefined && command.idempotencyTtlMs !== undefined) {
+      this.idempotencyCache.set(cacheKey, {
+        expiresAtMs: command.nowMs + command.idempotencyTtlMs,
+        result,
+      });
+    }
 
     return result;
   }

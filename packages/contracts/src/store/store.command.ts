@@ -6,15 +6,17 @@ export type StoreConsumeMode = 'counter' | 'token-bucket';
 
 export interface ConsumeCommand {
   readonly key: string;
-  readonly bucketCapacity?: number;
   readonly cost: number;
-  readonly idempotencyKey: string;
-  readonly idempotencyTtlMs: number;
   readonly limit: number;
   readonly mode: StoreConsumeMode;
   readonly nowMs: number;
-  readonly refillRatePerSec?: number;
+  readonly resetAtMs?: number;
   readonly windowMs: number;
+
+  readonly bucketCapacity?: number;
+  readonly idempotencyKey?: string;
+  readonly idempotencyTtlMs?: number;
+  readonly refillRatePerSec?: number;
 }
 
 export interface ConsumeResult {

@@ -1,5 +1,5 @@
 import type { RateLimiterResetCommand, ResetResult } from '../runtime/reset.contract';
-import type { ConsumeCommand, ConsumeOutcome, PeekCommand, PeekOutcome } from './store.command';
+import type { ConsumeCommand, ConsumeOutcome, PeekCommand, PeekOutcome, StoreConsumeMode } from './store.command';
 
 export type StoreHealthStatus = 'healthy' | 'degraded' | 'unavailable';
 
@@ -11,6 +11,8 @@ export interface StoreHealthReport {
 }
 
 interface BaseRateLimitStoreCapabilities {
+  readonly supportedModes: readonly StoreConsumeMode[];
+
   readonly consistentPeek: boolean;
 
   readonly expectedLatencyMs: number;

@@ -14,7 +14,7 @@ export function validateRequestMetadata(metadata: RequestMetadata): boolean {
   }
 
   for (const [key, value] of entries) {
-    if (!key.startsWith('x-') || key.length < 3) {
+    if (!/^x-[a-z0-9-]+$/u.test(key)) {
       return false;
     }
 

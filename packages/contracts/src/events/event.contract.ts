@@ -1,18 +1,23 @@
 import type { BypassReason, RateLimitEvaluationSnapshot } from '../domain/rate-limit.shared';
 import type { HttpMethod } from '../runtime/runtime.contract';
-import type { StoreFailureType } from '../store/store.failure';
+import type { StoreFailure, StoreFailureType } from '../store/store.failure';
 import { RATE_LIMIT_EVENT_SCHEMA_VERSION } from './event.constants';
+
+export interface RateLimitPolicyMissEventPayload {
+  readonly method: HttpMethod;
+  readonly route: string;
+}
 
 export interface RateLimitEventPayloadMap {
   'rate_limit.allowed': RateLimitAllowedEventPayload;
   'rate_limit.allowed_burst': RateLimitAllowedBurstEventPayload;
   'rate_limit.bypassed': RateLimitBypassedEventPayload;
   'rate_limit.degraded': RateLimitDegradedEventPayload;
+  'rate_limit.policy_miss': RateLimitPolicyMissEventPayload;
   'rate_limit.rejected': RateLimitRejectedEventPayload;
   'rate_limit.reset': RateLimitResetEventPayload;
   'rate_limit.rule_miss': RateLimitRuleMissEventPayload;
   'rate_limit.shadow': RateLimitShadowEventPayload;
-  'rate_limit.store_timeout': RateLimitStoreTimeoutEventPayload;
   'rate_limit.throttled': RateLimitThrottledEventPayload;
 }
 
@@ -42,6 +47,13 @@ export interface EventEnvelope<TType extends RateLimitEventType, TPayload> {
   readonly traceId?: string;
 
   readonly payload: TPayload;
+}
+
+export interface EventContext {
+  readonly causationId?: string;
+  readonly correlationId?: string;
+  readonly spanId?: string;
+  readonly traceId?: string;
 }
 
 export interface BaseRateLimitEventPayload {
@@ -98,13 +110,23 @@ export interface RateLimitDegradedEventPayload {
   readonly method?: HttpMethod;
   readonly route?: string;
 
-  readonly evaluation?: RateLimitEvaluationSnapshot;
+  readonly evaluation?: {
+    readonly ruleId?: string;
+    readonly remaining?: number;
+    readonly resetAtMs?: number;
+    readonly stale?: boolean;
+  };
 
   readonly cost?: number;
   readonly evaluationDurationUs?: number;
 
-  readonly failedOpen: boolean;
+  readonly failOpen: boolean;
   readonly storeFailureType: StoreFailureType;
+
+  readonly operation?: StoreFailure['operation'];
+  readonly retryable?: boolean;
+  readonly storeNode?: string;
+  readonly transient?: boolean;
 }
 
 export type RateLimitShadowEventPayload = BaseRateLimitEventPayload;
@@ -112,10 +134,6 @@ export type RateLimitShadowEventPayload = BaseRateLimitEventPayload;
 export interface RateLimitRuleMissEventPayload {
   readonly method: HttpMethod;
   readonly route: string;
-}
-
-export interface RateLimitStoreTimeoutEventPayload {
-  readonly timeoutMs: number;
 }
 
 export interface RateLimitResetEventPayload {

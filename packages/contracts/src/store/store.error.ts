@@ -1,8 +1,8 @@
+import { FluxGuardError } from '../errors/fluxguard.error';
 import type { StoreFailure } from './store.failure';
 
-export class StoreFailureError extends Error {
+export class StoreFailureError extends FluxGuardError {
   constructor(public readonly failure: StoreFailure) {
-    super(failure.type, { cause: failure });
-    this.name = 'StoreFailureError';
+    super(`${failure.type} (${failure.operation ?? 'unknown'})`, { cause: failure });
   }
 }

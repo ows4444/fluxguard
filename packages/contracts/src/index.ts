@@ -1,6 +1,7 @@
 export * from './domain/rate-limit.shared';
 export * from './enforcement/decision.contract';
 export * from './enforcement/enforcement.helpers';
+export * from './errors/fluxguard.error';
 export * from './events/event.constants';
 export * from './events/event.contract';
 export * from './events/event.definitions';
@@ -14,10 +15,9 @@ export type {
 } from './events/event.types';
 export * from './events/event-publisher.contract';
 export * from './policy/algorithm';
+export * from './policy/algorithm-capabilities';
 export * from './policy/matcher.contract';
 export * from './policy/policy.contract';
-export * from './policy/runtime-compatibility.constants';
-export * from './policy/runtime-compatibility.helpers';
 export * from './policy/validation.contract';
 export * from './policy/window.helpers';
 export * from './policy/window.types';

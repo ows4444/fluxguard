@@ -1,6 +1,12 @@
 import type { RateLimitAlgorithmId } from '@fluxguard/contracts';
 
 import type { RateLimitAlgorithm } from './algorithm.contract';
+import {
+  AlgorithmAlreadyRegisteredError,
+  AlgorithmNotRegisteredError,
+  AlgorithmRegistryFrozenError,
+  AlgorithmRegistryNotFrozenError,
+} from './algorithm-registry.errors';
 
 export class AlgorithmRegistry {
   private readonly algorithms = new Map<RateLimitAlgorithmId, RateLimitAlgorithm>();
@@ -20,11 +26,11 @@ export class AlgorithmRegistry {
 
   register(id: RateLimitAlgorithmId, algorithm: RateLimitAlgorithm): void {
     if (this.frozen) {
-      throw new Error('Algorithm registry frozen');
+      throw new AlgorithmRegistryFrozenError();
     }
 
     if (this.algorithms.has(id)) {
-      throw new Error(`Algorithm already registered: ${id}`);
+      throw new AlgorithmAlreadyRegisteredError(id);
     }
 
     this.algorithms.set(id, algorithm);
@@ -40,16 +46,13 @@ export class AlgorithmRegistry {
 
   get(id: RateLimitAlgorithmId): RateLimitAlgorithm {
     if (!this.frozen) {
-      throw new Error(
-        `AlgorithmRegistry.get() called before freeze(). ` +
-          `Call registry.freeze() after registering all algorithms during bootstrap.`,
-      );
+      throw new AlgorithmRegistryNotFrozenError();
     }
 
     const algorithm = this.algorithms.get(id);
 
     if (!algorithm) {
-      throw new Error(`Algorithm not registered: ${id}`);
+      throw new AlgorithmNotRegisteredError(id);
     }
 
     return algorithm;
