@@ -4,4 +4,5 @@ export interface RateLimiterResetCommand {
 
 export interface ResetResult {
   readonly deletedCount: number;
+  readonly deletedIdempotencyKeys?: number;
 }

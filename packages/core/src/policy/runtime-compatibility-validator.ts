@@ -7,6 +7,7 @@ import {
   type RuntimeCompatibilityError,
   type RuntimeCompatibilityValidator as IRuntimeCompatibilityValidator,
 } from '@fluxguard/contracts';
+import { supportsWindowType } from '@fluxguard/contracts';
 
 import type { AlgorithmRegistry } from '../algorithms/algorithm.registry';
 
@@ -32,7 +33,11 @@ export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValid
         continue;
       }
 
-      const capabilities = AlgorithmCapabilitiesRegistry[rule.execution.algorithm];
+      const isKnownAlgorithm = Object.prototype.hasOwnProperty.call(
+        AlgorithmCapabilitiesRegistry,
+        rule.execution.algorithm,
+      );
+      const capabilities = isKnownAlgorithm ? AlgorithmCapabilitiesRegistry[rule.execution.algorithm] : undefined;
 
       if (!capabilities) {
         errors.push({
@@ -48,6 +53,8 @@ export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValid
           ruleId: rule.id,
           message: `store does not support mode "${capabilities.storeMode}"`,
         });
+
+        continue;
       }
 
       if (!this.registry.has(rule.execution.algorithm)) {
@@ -58,7 +65,7 @@ export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValid
         continue;
       }
 
-      if (!capabilities.supportedWindows.includes(rule.quota.window.type)) {
+      if (!supportsWindowType(rule.execution.algorithm, rule.quota.window.type)) {
         errors.push({
           ruleId: rule.id,
           message: `algorithm "${rule.execution.algorithm}" does not support window type "${rule.quota.window.type}"`,

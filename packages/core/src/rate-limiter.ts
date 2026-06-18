@@ -31,6 +31,7 @@ import type { AlgorithmRegistry } from './algorithms/algorithm.registry';
 import { BypassChecker } from './bypass/bypass-checker';
 import { createEnforcement } from './enforcement/enforcement-factory';
 import { createDecisionEvent } from './events/decision-event-factory';
+import { EventPublishError } from './events/event-publish.error';
 import type { KeyBuilder } from './keys/key-builder';
 import type { RuleMatcher } from './policy/rule-matcher';
 import { type RuleSelection, RuleSelector } from './policy/rule-selector';
@@ -129,8 +130,7 @@ export class RateLimiter {
   }
 
   private async evaluateShadowRules(request: RateLimitRequest, shadows: readonly RateLimitRule[]): Promise<void> {
-    const budgetedShadows = shadows
-      .slice()
+    const budgetedShadows = [...shadows]
       .sort((a, b) => b.execution.priority - a.execution.priority)
       .slice(0, MAX_CONCURRENT_SHADOW_RULES);
     const results = await Promise.allSettled(
@@ -405,7 +405,11 @@ export class RateLimiter {
       payload: { deletedKeys: result.deletedCount },
     };
 
-    this.runDetached(cfg.publisher.publish(event));
+    this.runDetached(
+      cfg.publisher.publish(event).catch((error) => {
+        throw new EventPublishError(event.type, error);
+      }),
+    );
   }
 
   private publishDecision(decision: RateLimitDecision, request: RateLimitRequest): void {
@@ -423,7 +427,11 @@ export class RateLimiter {
     );
 
     if (event) {
-      this.runDetached(this.options.eventPublisher.publisher.publish(event));
+      this.runDetached(
+        this.options.eventPublisher.publisher.publish(event).catch((error) => {
+          throw new EventPublishError(event.type, error);
+        }),
+      );
     }
   }
 }

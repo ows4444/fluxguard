@@ -16,6 +16,7 @@ export type {
 export * from './events/event-publisher.contract';
 export * from './policy/algorithm';
 export * from './policy/algorithm-capabilities';
+export * from './policy/algorithm-validation';
 export * from './policy/matcher.contract';
 export * from './policy/policy.contract';
 export * from './policy/validation.contract';
@@ -39,3 +40,4 @@ export * from './store/store.command';
 export * from './store/store.contract';
 export * from './store/store.error';
 export * from './store/store.failure';
+export * from './store/store-capability.error';

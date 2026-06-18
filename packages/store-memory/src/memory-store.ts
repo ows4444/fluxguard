@@ -10,6 +10,7 @@ import {
   type RateLimitStoreCapabilities,
   type ResetResult,
   type StoreHealthReport,
+  UnsupportedStoreModeError,
 } from '@fluxguard/contracts';
 
 const MAX_SWEEP_ENTRIES = 100;
@@ -78,10 +79,7 @@ export class MemoryStore implements IRateLimitStore {
         break;
 
       case 'token-bucket':
-        throw new Error(
-          'MemoryStore does not implement token-bucket mode. ' +
-            'Use a store that supports token-bucket semantics (e.g. RedisStore).',
-        );
+        throw new UnsupportedStoreModeError(command.mode, this.capabilities().supportedModes);
 
       default:
         return assertNever(command.mode);

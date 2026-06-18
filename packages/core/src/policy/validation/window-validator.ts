@@ -7,6 +7,7 @@ import {
   type RateLimitRule,
 } from '@fluxguard/contracts';
 import { AlgorithmCapabilitiesRegistry } from '@fluxguard/contracts';
+import { supportsWindowType } from '@fluxguard/contracts';
 
 export function validateWindow(rule: RateLimitRule, errors: PolicyValidationError[]): void {
   const window = rule.quota.window;
@@ -35,9 +36,11 @@ export function validateWindow(rule: RateLimitRule, errors: PolicyValidationErro
     });
   }
 
-  const capabilities = AlgorithmCapabilitiesRegistry[rule.execution.algorithm];
+  if (!Object.prototype.hasOwnProperty.call(AlgorithmCapabilitiesRegistry, rule.execution.algorithm)) {
+    return;
+  }
 
-  if (!capabilities.supportedWindows.includes(window.type)) {
+  if (!supportsWindowType(rule.execution.algorithm, window.type)) {
     errors.push({
       path: ['rules', rule.id, 'quota', 'window'],
       message: `window type "${window.type}" is not supported by algorithm "${rule.execution.algorithm}"`,

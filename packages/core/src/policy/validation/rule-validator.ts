@@ -1,13 +1,30 @@
-import { POLICY_VALIDATION_LIMITS, type PolicyValidationError, type RateLimitRule } from '@fluxguard/contracts';
+import {
+  type AlgorithmCapabilities,
+  POLICY_VALIDATION_LIMITS,
+  type PolicyValidationError,
+  type RateLimitRule,
+} from '@fluxguard/contracts';
 import { AlgorithmCapabilitiesRegistry } from '@fluxguard/contracts';
 
 import { validateRoutePatterns } from './route-pattern-validator';
 import { validateWindow } from './window-validator';
 
 export function validateRule(rule: RateLimitRule, errors: PolicyValidationError[]): void {
-  const capabilities = AlgorithmCapabilitiesRegistry[rule.execution.algorithm];
+  const isKnownAlgorithm = Object.prototype.hasOwnProperty.call(
+    AlgorithmCapabilitiesRegistry,
+    rule.execution.algorithm,
+  );
+  const capabilities = isKnownAlgorithm ? AlgorithmCapabilitiesRegistry[rule.execution.algorithm] : undefined;
 
-  validateAlgorithmCompatibility(rule, capabilities, errors);
+  if (!capabilities) {
+    errors.push({
+      path: ['rules', rule.id, 'execution', 'algorithm'],
+      message: `unknown algorithm: "${rule.execution.algorithm}"`,
+    });
+  } else {
+    validateAlgorithmCompatibility(rule, capabilities, errors);
+  }
+
   validateExecution(rule, errors);
   validateQuota(rule, errors);
   validateMatchers(rule, errors);
@@ -17,7 +34,7 @@ export function validateRule(rule: RateLimitRule, errors: PolicyValidationError[
 
 function validateAlgorithmCompatibility(
   rule: RateLimitRule,
-  capabilities: (typeof AlgorithmCapabilitiesRegistry)[keyof typeof AlgorithmCapabilitiesRegistry],
+  capabilities: AlgorithmCapabilities,
   errors: PolicyValidationError[],
 ): void {
   if (!capabilities.supportsBurstLimit && rule.quota.burstLimit !== undefined) {
@@ -133,6 +150,8 @@ function validateMetadata(rule: RateLimitRule, errors: PolicyValidationError[]):
     return;
   }
 
+  const seen = new Set<string>();
+
   for (const tag of rule.meta?.tags ?? []) {
     if (tag.length > POLICY_VALIDATION_LIMITS.maxTagLength) {
       errors.push({
@@ -140,5 +159,15 @@ function validateMetadata(rule: RateLimitRule, errors: PolicyValidationError[]):
         message: 'tag length exceeded',
       });
     }
+
+    if (seen.has(tag)) {
+      errors.push({
+        path: ['rules', rule.id, 'meta', 'tags'],
+        message: `duplicate tag: "${tag}"`,
+      });
+      continue;
+    }
+
+    seen.add(tag);
   }
 }
