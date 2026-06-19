@@ -19,7 +19,7 @@ export function validateRoutePatterns(rule: RateLimitRule, errors: PolicyValidat
     const segments = pattern.split('/');
     const wildcardIndex = segments.indexOf('**');
 
-    if (wildcardIndex !== -1 && wildcardIndex !== pattern.split('/').length - 1) {
+    if (wildcardIndex !== -1 && wildcardIndex !== segments.length - 1) {
       errors.push({
         path: ['rules', rule.id, 'match', 'routePatterns'],
         message: '** wildcard must be final segment',

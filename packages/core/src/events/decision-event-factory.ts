@@ -101,6 +101,7 @@ export function createDecisionEvent(
         ...(decision.evaluation
           ? {
               evaluation: {
+                source: decision.evaluation.source,
                 ...(decision.evaluation.ruleId !== undefined ? { ruleId: decision.evaluation.ruleId } : {}),
                 ...(decision.evaluation.remaining !== undefined ? { remaining: decision.evaluation.remaining } : {}),
                 ...(decision.evaluation.resetAtMs !== undefined ? { resetAtMs: decision.evaluation.resetAtMs } : {}),
@@ -109,8 +110,9 @@ export function createDecisionEvent(
             }
           : {}),
 
-        ...(decision.failure.retryable !== undefined ? { retryable: decision.failure.retryable } : {}),
-        ...(decision.failure.transient !== undefined ? { transient: decision.failure.transient } : {}),
+        retryable: decision.failure.retryable,
+        transient: decision.failure.transient,
+
         ...(decision.failure.operation !== undefined ? { operation: decision.failure.operation } : {}),
         ...(decision.failure.storeNode !== undefined ? { storeNode: decision.failure.storeNode } : {}),
 

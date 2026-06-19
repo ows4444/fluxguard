@@ -2,7 +2,7 @@ export function assertNever(value: never, message = 'Unhandled discriminated uni
   let serialized = '[unserializable]';
 
   try {
-    serialized = typeof value === 'object' && value !== null ? Object.prototype.toString.call(value) : typeof value;
+    serialized = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
 
     if (serialized.length > 500) {
       serialized = `${serialized.slice(0, 500)}...`;

@@ -1,5 +1,5 @@
 import {
-  type AlgorithmCapabilities,
+  // type AlgorithmCapabilities,
   POLICY_VALIDATION_LIMITS,
   type PolicyValidationError,
   type RateLimitRule,
@@ -21,9 +21,10 @@ export function validateRule(rule: RateLimitRule, errors: PolicyValidationError[
       path: ['rules', rule.id, 'execution', 'algorithm'],
       message: `unknown algorithm: "${rule.execution.algorithm}"`,
     });
-  } else {
-    validateAlgorithmCompatibility(rule, capabilities, errors);
   }
+  //  else {
+  //   validateAlgorithmCompatibility(rule, capabilities, errors);
+  // }
 
   validateExecution(rule, errors);
   validateQuota(rule, errors);
@@ -32,25 +33,25 @@ export function validateRule(rule: RateLimitRule, errors: PolicyValidationError[
   validateWindow(rule, errors);
 }
 
-function validateAlgorithmCompatibility(
-  rule: RateLimitRule,
-  capabilities: AlgorithmCapabilities,
-  errors: PolicyValidationError[],
-): void {
-  if (!capabilities.supportsBurstLimit && rule.quota.burstLimit !== undefined) {
-    errors.push({
-      path: ['rules', rule.id, 'quota'],
-      message: 'burst configuration unsupported by algorithm',
-    });
-  }
+// function validateAlgorithmCompatibility(
+//   rule: RateLimitRule,
+//   capabilities: AlgorithmCapabilities,
+//   errors: PolicyValidationError[],
+// ): void {
+//   if (!capabilities.supportsBurstLimit && rule.quota.burstLimit !== undefined) {
+//     errors.push({
+//       path: ['rules', rule.id, 'quota'],
+//       message: 'burst configuration unsupported by algorithm',
+//     });
+//   }
 
-  if (!capabilities.supportsRefillRate && rule.quota.refillRatePerSec !== undefined) {
-    errors.push({
-      path: ['rules', rule.id, 'quota'],
-      message: 'refillRatePerSec unsupported by algorithm',
-    });
-  }
-}
+//   if (!capabilities.supportsRefillRate && rule.quota.refillRatePerSec !== undefined) {
+//     errors.push({
+//       path: ['rules', rule.id, 'quota'],
+//       message: 'refillRatePerSec unsupported by algorithm',
+//     });
+//   }
+// }
 
 function validateExecution(rule: RateLimitRule, errors: PolicyValidationError[]): void {
   const shedProbability = rule.execution.shedProbability;

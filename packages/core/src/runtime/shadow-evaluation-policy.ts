@@ -1,9 +1,11 @@
+import type { RateLimitRequest, RateLimitRule } from '@fluxguard/contracts';
+
 export interface ShadowEvaluationPolicy {
-  shouldEvaluate(): boolean;
+  shouldEvaluate(request: RateLimitRequest, shadows: readonly RateLimitRule[]): boolean;
 }
 
 export class AlwaysEvaluateShadowPolicy implements ShadowEvaluationPolicy {
-  shouldEvaluate(): boolean {
-    return true;
+  shouldEvaluate(_request: RateLimitRequest, shadows: readonly RateLimitRule[]): boolean {
+    return shadows.length > 0;
   }
 }

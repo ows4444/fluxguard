@@ -1,6 +1,7 @@
 import { type RateLimitPolicy } from '@fluxguard/contracts';
 
 import type { RuntimeCompatibilityValidator } from '../policy/runtime-compatibility-validator';
+import { RuntimeCompatibilityValidationError } from './runtime-compatibility.error';
 
 export function validateRuntimeCompatibilityOrThrow(
   validator: RuntimeCompatibilityValidator,
@@ -9,6 +10,6 @@ export function validateRuntimeCompatibilityOrThrow(
   const errors = validator.validate(policy);
 
   if (errors.length > 0) {
-    throw new Error(errors.map((e) => e.message).join(', '));
+    throw new RuntimeCompatibilityValidationError(errors);
   }
 }

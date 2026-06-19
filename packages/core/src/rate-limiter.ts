@@ -131,7 +131,7 @@ export class RateLimiter {
 
   private async evaluateShadowRules(request: RateLimitRequest, shadows: readonly RateLimitRule[]): Promise<void> {
     const budgetedShadows = [...shadows]
-      .sort((a, b) => b.execution.priority - a.execution.priority)
+      .sort((a, b) => b.execution.priority - a.execution.priority || a.id.localeCompare(b.id))
       .slice(0, MAX_CONCURRENT_SHADOW_RULES);
     const results = await Promise.allSettled(
       budgetedShadows.map(async (rule) => {
@@ -229,7 +229,7 @@ export class RateLimiter {
       }
 
       case 'shadow_only': {
-        if (this.shadowEvaluationPolicy.shouldEvaluate()) {
+        if (this.shadowEvaluationPolicy.shouldEvaluate(request, resolved.shadows)) {
           this.runDetached(this.evaluateShadowRules(request, resolved.shadows));
         }
 
@@ -267,7 +267,7 @@ export class RateLimiter {
       }
     }
 
-    if (this.shadowEvaluationPolicy.shouldEvaluate()) {
+    if (this.shadowEvaluationPolicy.shouldEvaluate(request, shadows)) {
       this.runDetached(this.evaluateShadowRules(request, shadows));
     }
 
@@ -369,7 +369,7 @@ export class RateLimiter {
         consistency: result.consistency,
         limit: rule.quota.limit,
         remaining: rule.quota.limit,
-        ...(resetAtMs !== undefined ? { resetAtMs } : {}),
+        resetAtMs,
       };
     }
 

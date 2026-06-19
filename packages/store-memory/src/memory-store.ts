@@ -13,7 +13,7 @@ import {
   UnsupportedStoreModeError,
 } from '@fluxguard/contracts';
 
-const MAX_SWEEP_ENTRIES = 100;
+const MAX_SWEEP_ENTRIES = 1000;
 
 interface CounterState {
   count: number;
@@ -36,7 +36,7 @@ export class MemoryStore implements IRateLimitStore {
   private sweepExpired(nowMs: number): void {
     this.operations = (this.operations + 1) % 1_000_000;
 
-    if (this.operations % 1000 !== 0) {
+    if (this.operations % 100 !== 0) {
       return;
     }
 
@@ -131,7 +131,7 @@ export class MemoryStore implements IRateLimitStore {
       allowed,
       fromIdempotencyCache: false,
       fromReplica: false,
-      remaining: Math.max(0, state.limit - state.count),
+      remaining: Math.max(0, command.limit - state.count),
       resetAtMs: state.resetAtMs,
     };
 
@@ -184,12 +184,14 @@ export class MemoryStore implements IRateLimitStore {
     }
     if (command.keyPrefix === undefined) {
       const deletedCount = this.counters.size;
+      const deletedIdempotencyKeys = this.idempotencyCache.size;
 
       this.counters.clear();
       this.idempotencyCache.clear();
 
       return {
         deletedCount,
+        deletedIdempotencyKeys,
       };
     }
 
@@ -214,12 +216,15 @@ export class MemoryStore implements IRateLimitStore {
       }
     }
 
+    let deletedIdempotencyKeys = 0;
     for (const cacheKey of idempotencyKeysToDelete) {
       this.idempotencyCache.delete(cacheKey);
+      deletedIdempotencyKeys++;
     }
 
     return {
       deletedCount,
+      deletedIdempotencyKeys,
     };
   }
 }

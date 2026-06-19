@@ -2,7 +2,7 @@ import { FluxGuardError } from '@fluxguard/contracts';
 
 export abstract class AlgorithmRegistryError extends FluxGuardError {}
 
-export class UnsupportedAlgorithmWindowError extends FluxGuardError {
+export class UnsupportedAlgorithmWindowError extends AlgorithmRegistryError {
   constructor(ruleId: string, actual: string, expected: string) {
     super(`Rule "${ruleId}" uses window "${actual}" but algorithm expects "${expected}"`);
   }

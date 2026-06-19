@@ -1,5 +1,4 @@
 import {
-  AlgorithmCapabilitiesRegistry,
   type Clock,
   type IRateLimitStore,
   isCalendarMonthWindow,
@@ -7,7 +6,6 @@ import {
   type RuntimeCompatibilityError,
   type RuntimeCompatibilityValidator as IRuntimeCompatibilityValidator,
 } from '@fluxguard/contracts';
-import { supportsWindowType } from '@fluxguard/contracts';
 
 import type { AlgorithmRegistry } from '../algorithms/algorithm.registry';
 
@@ -33,19 +31,32 @@ export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValid
         continue;
       }
 
-      const isKnownAlgorithm = Object.prototype.hasOwnProperty.call(
-        AlgorithmCapabilitiesRegistry,
-        rule.execution.algorithm,
-      );
-      const capabilities = isKnownAlgorithm ? AlgorithmCapabilitiesRegistry[rule.execution.algorithm] : undefined;
+      const registration = this.registry.has(rule.execution.algorithm)
+        ? this.registry.getRegistration(rule.execution.algorithm)
+        : undefined;
 
-      if (!capabilities) {
+      if (!registration) {
         errors.push({
           ruleId: rule.id,
-          message: `capabilities not registered for algorithm "${rule.execution.algorithm}"`,
+          message: `algorithm "${rule.execution.algorithm}" is not registered in AlgorithmRegistry`,
         });
-
         continue;
+      }
+
+      const capabilities = registration.capabilities;
+
+      if (!capabilities.supportsBurstLimit && rule.quota.burstLimit !== undefined) {
+        errors.push({
+          ruleId: rule.id,
+          message: 'burst configuration unsupported by algorithm',
+        });
+      }
+
+      if (!capabilities.supportsRefillRate && rule.quota.refillRatePerSec !== undefined) {
+        errors.push({
+          ruleId: rule.id,
+          message: 'refillRatePerSec unsupported by algorithm',
+        });
       }
 
       if (!supportedModes.includes(capabilities.storeMode)) {
@@ -57,15 +68,7 @@ export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValid
         continue;
       }
 
-      if (!this.registry.has(rule.execution.algorithm)) {
-        errors.push({
-          ruleId: rule.id,
-          message: `algorithm not available: ${rule.execution.algorithm}`,
-        });
-        continue;
-      }
-
-      if (!supportsWindowType(rule.execution.algorithm, rule.quota.window.type)) {
+      if (!capabilities.supportedWindows.includes(rule.quota.window.type)) {
         errors.push({
           ruleId: rule.id,
           message: `algorithm "${rule.execution.algorithm}" does not support window type "${rule.quota.window.type}"`,

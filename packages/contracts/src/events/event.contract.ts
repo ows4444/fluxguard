@@ -1,4 +1,5 @@
 import type { BypassReason, RateLimitEvaluationSnapshot } from '../domain/rate-limit.shared';
+import type { DegradedRateLimitEvaluation } from '../enforcement/decision.contract';
 import type { HttpMethod } from '../runtime/runtime.contract';
 import type { StoreFailure, StoreFailureType } from '../store/store.failure';
 import { RATE_LIMIT_EVENT_SCHEMA_VERSION } from './event.constants';
@@ -110,12 +111,7 @@ export interface RateLimitDegradedEventPayload {
   readonly method?: HttpMethod;
   readonly route?: string;
 
-  readonly evaluation?: {
-    readonly ruleId?: string;
-    readonly remaining?: number;
-    readonly resetAtMs?: number;
-    readonly stale?: boolean;
-  };
+  readonly evaluation?: DegradedRateLimitEvaluation;
 
   readonly cost?: number;
   readonly evaluationDurationUs?: number;

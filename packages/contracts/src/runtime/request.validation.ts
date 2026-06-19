@@ -20,26 +20,47 @@ function fail(field: string, message: string): RequestValidationResult {
 }
 
 export function validateRequest(request: RateLimitRequest): RequestValidationResult {
+  const errors: RequestValidationError[] = [];
   const routeResult = parseRouteTemplate(request.route);
   if (!routeResult.ok) {
-    return fail('route', routeResult.error);
+    errors.push({
+      field: 'route',
+      message: routeResult.error,
+    });
   }
 
   if (!parseIpAddress(request.ip).ok) {
-    return fail('ip', 'invalid IP address');
+    errors.push({
+      field: 'ip',
+      message: 'invalid IP address',
+    });
   }
 
   const cost = request.cost ?? DEFAULT_REQUEST_COST;
   if (!Number.isFinite(cost)) {
-    return fail('cost', 'cost must be a finite number');
+    errors.push({
+      field: 'cost',
+      message: 'cost must be a finite number',
+    });
   }
   if (cost <= 0) {
-    return fail('cost', 'cost must be greater than 0');
+    errors.push({
+      field: 'cost',
+      message: 'cost must be greater than 0',
+    });
   }
 
   if (request.meta && !validateRequestMetadata(request.meta)) {
-    return fail('meta', 'invalid request metadata');
+    errors.push({
+      field: 'meta',
+      message: 'invalid request metadata',
+    });
   }
 
-  return VALID;
+  return errors.length === 0
+    ? VALID
+    : {
+        valid: false,
+        errors,
+      };
 }

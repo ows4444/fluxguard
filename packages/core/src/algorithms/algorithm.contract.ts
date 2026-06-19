@@ -1,3 +1,5 @@
+import type { AlgorithmCapabilities } from '@fluxguard/contracts';
+
 import type { EvaluationContext } from '../runtime/evaluation-context';
 import type { ShadowEvaluationContext } from '../runtime/shadow-evaluation-context';
 
@@ -19,4 +21,9 @@ export interface RateLimitAlgorithm {
   evaluate(context: EvaluationContext): Promise<AlgorithmResult>;
 
   evaluateShadow(context: ShadowEvaluationContext): Promise<void>;
+}
+
+export interface RegisteredAlgorithm {
+  readonly capabilities: AlgorithmCapabilities;
+  readonly implementation: RateLimitAlgorithm;
 }

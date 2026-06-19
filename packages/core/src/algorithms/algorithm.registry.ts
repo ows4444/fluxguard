@@ -1,6 +1,6 @@
 import type { RateLimitAlgorithmId } from '@fluxguard/contracts';
 
-import type { RateLimitAlgorithm } from './algorithm.contract';
+import type { RateLimitAlgorithm, RegisteredAlgorithm } from './algorithm.contract';
 import {
   AlgorithmAlreadyRegisteredError,
   AlgorithmNotRegisteredError,
@@ -9,14 +9,14 @@ import {
 } from './algorithm-registry.errors';
 
 export class AlgorithmRegistry {
-  private readonly algorithms = new Map<RateLimitAlgorithmId, RateLimitAlgorithm>();
+  private readonly algorithms = new Map<RateLimitAlgorithmId, RegisteredAlgorithm>();
   private frozen = false;
 
-  static create(registrations: ReadonlyArray<readonly [RateLimitAlgorithmId, RateLimitAlgorithm]>): AlgorithmRegistry {
+  static create(registrations: ReadonlyArray<readonly [RateLimitAlgorithmId, RegisteredAlgorithm]>): AlgorithmRegistry {
     const registry = new AlgorithmRegistry();
 
-    for (const [id, algorithm] of registrations) {
-      registry.register(id, algorithm);
+    for (const [id, registration] of registrations) {
+      registry.register(id, registration);
     }
 
     registry.freeze();
@@ -24,7 +24,7 @@ export class AlgorithmRegistry {
     return registry;
   }
 
-  register(id: RateLimitAlgorithmId, algorithm: RateLimitAlgorithm): void {
+  register(id: RateLimitAlgorithmId, registration: RegisteredAlgorithm): void {
     if (this.frozen) {
       throw new AlgorithmRegistryFrozenError();
     }
@@ -33,7 +33,7 @@ export class AlgorithmRegistry {
       throw new AlgorithmAlreadyRegisteredError(id);
     }
 
-    this.algorithms.set(id, algorithm);
+    this.algorithms.set(id, registration);
   }
 
   freeze(): void {
@@ -41,20 +41,28 @@ export class AlgorithmRegistry {
   }
 
   has(id: RateLimitAlgorithmId): boolean {
-    return this.algorithms.has(id);
-  }
-
-  get(id: RateLimitAlgorithmId): RateLimitAlgorithm {
     if (!this.frozen) {
       throw new AlgorithmRegistryNotFrozenError();
     }
 
-    const algorithm = this.algorithms.get(id);
+    return this.algorithms.has(id);
+  }
 
-    if (!algorithm) {
+  get(id: RateLimitAlgorithmId): RateLimitAlgorithm {
+    return this.getRegistration(id).implementation;
+  }
+
+  getRegistration(id: RateLimitAlgorithmId): RegisteredAlgorithm {
+    if (!this.frozen) {
+      throw new AlgorithmRegistryNotFrozenError();
+    }
+
+    const registration = this.algorithms.get(id);
+
+    if (!registration) {
       throw new AlgorithmNotRegisteredError(id);
     }
 
-    return algorithm;
+    return registration;
   }
 }

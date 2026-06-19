@@ -67,7 +67,7 @@ export function isStoreFailure(value: unknown): value is StoreFailure {
     candidate.ok === false &&
     typeof candidate.type === 'string' &&
     KNOWN_STORE_FAILURE_TYPES.has(candidate.type) &&
-    typeof candidate.occurredAtMs === 'number' &&
+    Number.isFinite(candidate.occurredAtMs) &&
     typeof candidate.retryable === 'boolean' &&
     typeof candidate.transient === 'boolean' &&
     (candidate.operation === undefined || candidate.operation === 'consume' || candidate.operation === 'peek') &&
