@@ -8,6 +8,7 @@ import {
 } from '@fluxguard/contracts';
 
 import type { AlgorithmRegistry } from '../algorithms/algorithm.registry';
+import { checkAlgorithmCapabilities } from './shared/algorithm-capability-check';
 
 export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValidator {
   constructor(
@@ -45,17 +46,12 @@ export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValid
 
       const capabilities = registration.capabilities;
 
-      if (!capabilities.supportsBurstLimit && rule.quota.burstLimit !== undefined) {
-        errors.push({
-          ruleId: rule.id,
-          message: 'burst configuration unsupported by algorithm',
-        });
-      }
+      const violations = checkAlgorithmCapabilities(rule, capabilities);
 
-      if (!capabilities.supportsRefillRate && rule.quota.refillRatePerSec !== undefined) {
+      for (const violation of violations) {
         errors.push({
           ruleId: rule.id,
-          message: 'refillRatePerSec unsupported by algorithm',
+          message: violation.message,
         });
       }
 
@@ -66,13 +62,6 @@ export class RuntimeCompatibilityValidator implements IRuntimeCompatibilityValid
         });
 
         continue;
-      }
-
-      if (!capabilities.supportedWindows.includes(rule.quota.window.type)) {
-        errors.push({
-          ruleId: rule.id,
-          message: `algorithm "${rule.execution.algorithm}" does not support window type "${rule.quota.window.type}"`,
-        });
       }
     }
 

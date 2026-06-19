@@ -1,3 +1,4 @@
+export * from './domain/algorithm-state.contract';
 export * from './domain/rate-limit.shared';
 export * from './enforcement/decision.contract';
 export * from './enforcement/enforcement.helpers';
@@ -14,6 +15,8 @@ export type {
   RateLimitEventSeverity,
 } from './events/event.types';
 export * from './events/event-publisher.contract';
+export * from './events/event-registry-validator';
+export * from './events/event-schema.contract';
 export * from './policy/algorithm';
 export * from './policy/algorithm-capabilities';
 export * from './policy/algorithm-validation';

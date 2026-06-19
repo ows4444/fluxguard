@@ -1,6 +1,5 @@
-import { type RateLimitPolicy } from '@fluxguard/contracts';
+import { type RateLimitPolicy, type RuntimeCompatibilityValidator } from '@fluxguard/contracts';
 
-import type { RuntimeCompatibilityValidator } from '../policy/runtime-compatibility-validator';
 import { RuntimeCompatibilityValidationError } from './runtime-compatibility.error';
 
 export function validateRuntimeCompatibilityOrThrow(

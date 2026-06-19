@@ -1,11 +1,12 @@
 import {
-  // type AlgorithmCapabilities,
+  AlgorithmCapabilitiesRegistry,
+  getAlgorithmCapabilities,
   POLICY_VALIDATION_LIMITS,
   type PolicyValidationError,
   type RateLimitRule,
 } from '@fluxguard/contracts';
-import { AlgorithmCapabilitiesRegistry } from '@fluxguard/contracts';
 
+import { validateAlgorithmConfiguration } from './algorithm-capability-validator';
 import { validateRoutePatterns } from './route-pattern-validator';
 import { validateWindow } from './window-validator';
 
@@ -14,44 +15,24 @@ export function validateRule(rule: RateLimitRule, errors: PolicyValidationError[
     AlgorithmCapabilitiesRegistry,
     rule.execution.algorithm,
   );
-  const capabilities = isKnownAlgorithm ? AlgorithmCapabilitiesRegistry[rule.execution.algorithm] : undefined;
+
+  const capabilities = isKnownAlgorithm ? getAlgorithmCapabilities(rule.execution.algorithm) : undefined;
 
   if (!capabilities) {
     errors.push({
       path: ['rules', rule.id, 'execution', 'algorithm'],
       message: `unknown algorithm: "${rule.execution.algorithm}"`,
     });
+  } else {
+    validateAlgorithmConfiguration(rule, capabilities, errors);
   }
-  //  else {
-  //   validateAlgorithmCompatibility(rule, capabilities, errors);
-  // }
 
   validateExecution(rule, errors);
   validateQuota(rule, errors);
   validateMatchers(rule, errors);
   validateMetadata(rule, errors);
-  validateWindow(rule, errors);
+  validateWindow(rule, errors, capabilities);
 }
-
-// function validateAlgorithmCompatibility(
-//   rule: RateLimitRule,
-//   capabilities: AlgorithmCapabilities,
-//   errors: PolicyValidationError[],
-// ): void {
-//   if (!capabilities.supportsBurstLimit && rule.quota.burstLimit !== undefined) {
-//     errors.push({
-//       path: ['rules', rule.id, 'quota'],
-//       message: 'burst configuration unsupported by algorithm',
-//     });
-//   }
-
-//   if (!capabilities.supportsRefillRate && rule.quota.refillRatePerSec !== undefined) {
-//     errors.push({
-//       path: ['rules', rule.id, 'quota'],
-//       message: 'refillRatePerSec unsupported by algorithm',
-//     });
-//   }
-// }
 
 function validateExecution(rule: RateLimitRule, errors: PolicyValidationError[]): void {
   const shedProbability = rule.execution.shedProbability;

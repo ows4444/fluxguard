@@ -1,49 +1,37 @@
 import type { RateLimitRequest, RateLimitRule } from '@fluxguard/contracts';
 
-function matchPattern(pattern: string, route: string): boolean {
-  if (pattern.endsWith('/**')) {
-    const prefix = pattern.slice(0, -3);
-
-    return route === prefix || route.startsWith(`${prefix}/`);
-  }
-
-  if (pattern === route) {
-    return true;
-  }
-
-  const patternSegments = pattern.split('/');
-  const routeSegments = route.split('/');
-
-  let i = 0;
-
-  while (i < patternSegments.length) {
-    const patternSegment = patternSegments[i];
-
-    if (patternSegment === undefined) {
-      return false;
-    }
-
-    if (patternSegment === '**') {
-      return i === patternSegments.length - 1;
-    }
-
-    const routeSegment = routeSegments[i];
-
-    if (routeSegment === undefined) {
-      return false;
-    }
-
-    if (patternSegment !== routeSegment && !patternSegment.startsWith(':')) {
-      return false;
-    }
-
-    i++;
-  }
-
-  return i === routeSegments.length;
-}
+import { compileRoutePattern } from './compiled-route-pattern';
+import { matchesCompiledPattern } from './route-pattern-matcher';
 
 export class RuleMatcher {
+  private readonly compiledPatterns = new Map<string, ReturnType<typeof compileRoutePattern>>();
+
+  private getCompiledPattern(pattern: string) {
+    let compiled = this.compiledPatterns.get(pattern);
+
+    if (compiled) {
+      this.compiledPatterns.delete(pattern);
+      this.compiledPatterns.set(pattern, compiled);
+      return compiled;
+    }
+
+    const MAX_COMPILED_PATTERNS = 10_000;
+
+    compiled = compileRoutePattern(pattern);
+
+    if (this.compiledPatterns.size >= MAX_COMPILED_PATTERNS) {
+      const oldest = this.compiledPatterns.keys().next().value;
+
+      if (oldest) {
+        this.compiledPatterns.delete(oldest);
+      }
+    }
+
+    this.compiledPatterns.set(pattern, compiled);
+
+    return compiled;
+  }
+
   matches(rule: RateLimitRule, request: RateLimitRequest): boolean {
     return this.matchesMethod(rule, request) && this.matchesRoute(rule, request);
   }
@@ -65,6 +53,6 @@ export class RuleMatcher {
       return true;
     }
 
-    return patterns.some((pattern) => matchPattern(pattern, request.route));
+    return patterns.some((pattern) => matchesCompiledPattern(this.getCompiledPattern(pattern), request.route));
   }
 }

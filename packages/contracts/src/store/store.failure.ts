@@ -63,7 +63,7 @@ export function isStoreFailure(value: unknown): value is StoreFailure {
 
   const candidate = value as Partial<StoreFailure>;
 
-  return (
+  const baseValid =
     candidate.ok === false &&
     typeof candidate.type === 'string' &&
     KNOWN_STORE_FAILURE_TYPES.has(candidate.type) &&
@@ -71,8 +71,31 @@ export function isStoreFailure(value: unknown): value is StoreFailure {
     typeof candidate.retryable === 'boolean' &&
     typeof candidate.transient === 'boolean' &&
     (candidate.operation === undefined || candidate.operation === 'consume' || candidate.operation === 'peek') &&
-    (candidate.storeNode === undefined || typeof candidate.storeNode === 'string')
-  );
+    (candidate.storeNode === undefined || typeof candidate.storeNode === 'string');
+
+  if (!baseValid) {
+    return false;
+  }
+
+  switch (candidate.type) {
+    case StoreFailureType.Timeout:
+      return Number.isFinite(candidate.timeoutMs);
+
+    case StoreFailureType.ConnectionLost:
+      return true;
+
+    case StoreFailureType.CircuitOpen:
+      return Number.isFinite(candidate.retryAtMs);
+
+    case StoreFailureType.InvalidResponse:
+      return true;
+
+    case StoreFailureType.Unknown:
+      return true;
+
+    default:
+      return false;
+  }
 }
 
 export function isStoreSuccess<T extends { readonly ok: true } | { readonly ok: false }>(

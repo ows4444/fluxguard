@@ -6,3 +6,9 @@ export class StoreFailureError extends FluxGuardError {
     super(`${failure.type} (${failure.operation ?? 'unknown'})`, { cause: failure });
   }
 }
+
+export class InvalidResetCommandError extends FluxGuardError {
+  constructor(message: string) {
+    super(message);
+  }
+}

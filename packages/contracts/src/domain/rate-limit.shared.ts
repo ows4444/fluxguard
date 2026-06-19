@@ -1,3 +1,5 @@
+import type { AlgorithmState } from './algorithm-state.contract';
+
 export interface RateLimitEvaluationSnapshot {
   readonly ruleId: string;
 
@@ -5,6 +7,8 @@ export interface RateLimitEvaluationSnapshot {
 
   readonly remaining: number;
   readonly resetAtMs: number;
+
+  readonly algorithmState?: AlgorithmState;
 }
 
 export type BypassReason = 'exempt-user' | 'exempt-cidr' | 'bypass-token';

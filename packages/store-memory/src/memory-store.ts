@@ -3,6 +3,7 @@ import {
   type ConsumeCommand,
   type ConsumeOutcome,
   type ConsumeResult,
+  InvalidResetCommandError,
   type IRateLimitStore,
   type PeekCommand,
   type PeekOutcome,
@@ -31,15 +32,24 @@ export class MemoryStore implements IRateLimitStore {
 
   private readonly idempotencyCache = new Map<string, IdempotencyRecord>();
 
-  private operations = 0;
+  private static readonly CAPABILITIES: RateLimitStoreCapabilities = Object.freeze({
+    consistency: 'strong',
+    supportedModes: ['counter'] as const,
+    consistentPeek: true,
+    durability: 'memory-only',
+    expectedLatencyMs: 0,
+    idempotent: true,
+    replication: 'single-node',
+  });
+
+  private sweepTimer: NodeJS.Timeout | undefined;
+
+  constructor(private readonly sweepIntervalMs = 30_000) {
+    this.sweepTimer = setInterval(() => this.sweepExpired(Date.now()), this.sweepIntervalMs);
+    this.sweepTimer.unref?.();
+  }
 
   private sweepExpired(nowMs: number): void {
-    this.operations = (this.operations + 1) % 1_000_000;
-
-    if (this.operations % 100 !== 0) {
-      return;
-    }
-
     let swept = 0;
     for (const [key, value] of this.counters.entries()) {
       if (swept >= MAX_SWEEP_ENTRIES) break;
@@ -60,20 +70,10 @@ export class MemoryStore implements IRateLimitStore {
   }
 
   capabilities(): RateLimitStoreCapabilities {
-    return {
-      consistency: 'strong',
-      supportedModes: ['counter'],
-      consistentPeek: true,
-      durability: 'memory-only',
-      expectedLatencyMs: 0,
-      idempotent: true,
-      replication: 'single-node',
-    };
+    return MemoryStore.CAPABILITIES;
   }
 
   async consume(command: ConsumeCommand): Promise<ConsumeOutcome> {
-    this.sweepExpired(command.nowMs);
-
     switch (command.mode) {
       case 'counter':
         break;
@@ -95,9 +95,9 @@ export class MemoryStore implements IRateLimitStore {
       };
     } else if (state.limit !== command.limit) {
       state = {
-        count: 0,
+        count: Math.min(state.count, command.limit),
         limit: command.limit,
-        resetAtMs: command.resetAtMs ?? command.nowMs + command.windowMs,
+        resetAtMs: state.resetAtMs,
       };
     }
 
@@ -111,6 +111,8 @@ export class MemoryStore implements IRateLimitStore {
       if (cached && cached.expiresAtMs > command.nowMs) {
         return {
           ...cached.result,
+          remaining: Math.max(0, Math.min(cached.result.remaining, command.limit)),
+
           fromIdempotencyCache: true,
         };
       }
@@ -146,7 +148,6 @@ export class MemoryStore implements IRateLimitStore {
   }
 
   async peek(command: PeekCommand): Promise<PeekOutcome> {
-    this.sweepExpired(command.nowMs);
     const state = this.counters.get(command.key);
 
     if (!state || state.resetAtMs <= command.nowMs) {
@@ -178,8 +179,8 @@ export class MemoryStore implements IRateLimitStore {
 
   async reset(command: RateLimiterResetCommand): Promise<ResetResult> {
     if (command.keyPrefix !== undefined && command.keyPrefix.length === 0) {
-      throw new Error(
-        'keyPrefix must be a non-empty string or undefined. ' + 'To reset all keys, omit keyPrefix entirely.',
+      throw new InvalidResetCommandError(
+        'keyPrefix must be a non-empty string or undefined. To reset all keys, omit keyPrefix entirely.',
       );
     }
     if (command.keyPrefix === undefined) {
@@ -199,7 +200,7 @@ export class MemoryStore implements IRateLimitStore {
 
     const toDelete: string[] = [];
     for (const key of this.counters.keys()) {
-      if (key === command.keyPrefix || key.startsWith(`${command.keyPrefix}:`)) {
+      if (key.startsWith(command.keyPrefix)) {
         toDelete.push(key);
       }
     }
@@ -211,7 +212,7 @@ export class MemoryStore implements IRateLimitStore {
     const idempotencyKeysToDelete: string[] = [];
 
     for (const cacheKey of this.idempotencyCache.keys()) {
-      if (cacheKey === command.keyPrefix || cacheKey.startsWith(`${command.keyPrefix}:`)) {
+      if (cacheKey.startsWith(command.keyPrefix)) {
         idempotencyKeysToDelete.push(cacheKey);
       }
     }
@@ -226,5 +227,12 @@ export class MemoryStore implements IRateLimitStore {
       deletedCount,
       deletedIdempotencyKeys,
     };
+  }
+
+  dispose(): void {
+    if (this.sweepTimer) {
+      clearInterval(this.sweepTimer);
+      this.sweepTimer = undefined;
+    }
   }
 }

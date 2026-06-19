@@ -16,3 +16,5 @@ export * from './runtime/default-request-identity-provider';
 export * from './runtime/degradation-policy';
 export * from './runtime/request-identity-provider';
 export * from './runtime/runtime-compatibility.error';
+export * from './runtime/shadow-evaluation-budget';
+export * from './runtime/shadow-evaluation-timeout.error';

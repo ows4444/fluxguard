@@ -1,4 +1,6 @@
+import type { AlgorithmState } from '../domain/algorithm-state.contract';
 import type { PeekConsistency } from '../store/store.command';
+import type { TracingContext } from './tracing.contract';
 
 export interface Clock {
   calendarWindowResetAtMs(timezone: string, anchorDay?: number): number;
@@ -21,12 +23,7 @@ export type RequestMetadata = Readonly<Record<RequestMetadataKey, string>>;
 
 export const DEFAULT_REQUEST_COST = 1;
 
-export interface RequestTracingContext {
-  readonly causationId?: string;
-  readonly correlationId?: string;
-  readonly spanId?: string;
-  readonly traceId?: string;
-}
+export type RequestTracingContext = TracingContext;
 
 export const REQUEST_METADATA_LIMITS = Object.freeze({
   maxEntries: 32,
@@ -54,4 +51,6 @@ export interface RateLimitSnapshot {
   readonly limit: number;
   readonly remaining: number;
   readonly resetAtMs?: number;
+
+  readonly algorithmState?: AlgorithmState;
 }

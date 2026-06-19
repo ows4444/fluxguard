@@ -8,6 +8,13 @@ export function createEvaluationSnapshot(ruleId: string, limit: number, result: 
     limit,
     remaining: result.remaining,
     resetAtMs: result.resetAtMs,
+
+    ...(result.algorithmState !== undefined
+      ? {
+          algorithmState: result.algorithmState,
+        }
+      : {}),
+
     ...(result.nextAllowedAtMs !== undefined ? { nextAllowedAtMs: result.nextAllowedAtMs } : {}),
   };
 }

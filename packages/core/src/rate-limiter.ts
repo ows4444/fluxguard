@@ -1,7 +1,6 @@
-import { randomUUID } from 'node:crypto';
-
 import type {
   Clock,
+  EventContext,
   EventPublisher,
   IBypassTokenVerifier,
   IPolicyResolver,
@@ -21,7 +20,6 @@ import {
   InvalidRateLimitRequestError,
   isCalendarMonthWindow,
   isFixedWindow,
-  RATE_LIMIT_EVENT_SCHEMA_VERSION,
   StoreFailureError,
   validateRequest,
   windowToMs,
@@ -31,6 +29,7 @@ import type { AlgorithmRegistry } from './algorithms/algorithm.registry';
 import { BypassChecker } from './bypass/bypass-checker';
 import { createEnforcement } from './enforcement/enforcement-factory';
 import { createDecisionEvent } from './events/decision-event-factory';
+import { createEventEnvelope } from './events/event-envelope';
 import { EventPublishError } from './events/event-publish.error';
 import type { KeyBuilder } from './keys/key-builder';
 import type { RuleMatcher } from './policy/rule-matcher';
@@ -40,8 +39,11 @@ import { type ErrorReporter, NoopErrorReporter } from './runtime/error-reporter'
 import { createEvaluationSnapshot } from './runtime/evaluation-snapshot';
 import type { RequestIdentityProvider } from './runtime/request-identity-provider';
 import type { RuleResolutionResult } from './runtime/resolved-rule';
+import { DEFAULT_SHADOW_EVALUATION_BUDGET, withTimeout } from './runtime/shadow-evaluation-budget';
 import { AlwaysEvaluateShadowPolicy, type ShadowEvaluationPolicy } from './runtime/shadow-evaluation-policy';
+import { ShadowEvaluationTimeoutError } from './runtime/shadow-evaluation-timeout.error';
 import { ShadowRuleEvaluationError } from './runtime/shadow-rule-error';
+import { ShadowTimeoutExceededError } from './runtime/shadow-timeout.error';
 
 const MAX_CONCURRENT_SHADOW_RULES = 10;
 
@@ -142,23 +144,45 @@ export class RateLimiter {
         if (!algorithm.supportsShadowEvaluation) {
           return;
         }
+        const shadowIdempotencyKey = this.options.requestIdentityProvider.create(request, key, rule.id);
 
-        await algorithm.evaluateShadow({
-          key,
-          rule,
-          request,
-          clock: this.options.clock,
-          startedAtUs: this.options.clock.monotonicUs(),
-        });
+        try {
+          await withTimeout(
+            (signal) =>
+              algorithm.evaluateShadow({
+                key,
+                rule,
+                request,
+                clock: this.options.clock,
+                store: this.options.store,
+                signal,
+                ...(shadowIdempotencyKey !== undefined ? { idempotencyKey: shadowIdempotencyKey } : {}),
+                startedAtUs: this.options.clock.monotonicUs(),
+              }),
+            DEFAULT_SHADOW_EVALUATION_BUDGET.timeoutMs,
+          );
+        } catch (error) {
+          if (error instanceof ShadowTimeoutExceededError) {
+            throw new ShadowEvaluationTimeoutError(
+              rule.id,
+              rule.execution.algorithm,
+              DEFAULT_SHADOW_EVALUATION_BUDGET.timeoutMs,
+            );
+          }
+
+          throw error;
+        }
       }),
     );
 
     for (const [index, result] of results.entries()) {
+      const rule = budgetedShadows[index];
+      if (!rule) continue;
       if (result.status === 'rejected') {
         this.onDetachedFailure(
           new ShadowRuleEvaluationError(
-            budgetedShadows[index]!.id,
-            budgetedShadows[index]!.execution.algorithm,
+            rule.id,
+            rule.execution.algorithm,
             request.route,
             request.method,
             result.reason,
@@ -276,6 +300,8 @@ export class RateLimiter {
     try {
       const idempotencyKey = this.options.requestIdentityProvider.create(request, key, rule.id);
 
+      const algorithmStartedUs = this.options.clock.monotonicUs();
+
       const result = await algorithm.evaluate({
         key,
         rule,
@@ -285,6 +311,8 @@ export class RateLimiter {
         startedAtUs,
         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
       });
+
+      const algorithmDurationUs = this.options.clock.monotonicUs() - algorithmStartedUs;
 
       const totalEvaluationDurationUs = this.options.clock.monotonicUs() - startedAtUs;
 
@@ -296,6 +324,10 @@ export class RateLimiter {
         type: 'success',
         diagnostics: {
           totalEvaluationDurationUs,
+
+          algorithmDurationUs,
+          ...(result.fromIdempotencyCache !== undefined ? { fromIdempotencyCache: result.fromIdempotencyCache } : {}),
+          ...(result.fromReplica !== undefined ? { usedReplicaRead: result.fromReplica } : {}),
         },
         enforcement,
         evaluation: createEvaluationSnapshot(rule.id, rule.quota.limit, result),
@@ -370,6 +402,12 @@ export class RateLimiter {
         limit: rule.quota.limit,
         remaining: rule.quota.limit,
         resetAtMs,
+        ...(result.nextAllowedAtMs !== undefined ? { nextAllowedAtMs: result.nextAllowedAtMs } : {}),
+        ...(result.algorithmState !== undefined
+          ? {
+              algorithmState: result.algorithmState,
+            }
+          : {}),
       };
     }
 
@@ -378,35 +416,46 @@ export class RateLimiter {
       limit: rule.quota.limit,
       remaining: result.remaining,
       resetAtMs: result.resetAtMs,
+      ...(result.nextAllowedAtMs !== undefined ? { nextAllowedAtMs: result.nextAllowedAtMs } : {}),
+
+      ...(result.algorithmState !== undefined
+        ? {
+            algorithmState: result.algorithmState,
+          }
+        : {}),
     };
   }
 
   async reset(command: RateLimiterResetCommand): Promise<ResetResult> {
     const result = await this.options.store.reset(command);
-    this.publishResetEvent(result);
+
+    this.publishResetEvent(result, command.context);
     return result;
   }
 
-  private publishResetEvent(result: ResetResult): void {
+  private publishResetEvent(result: ResetResult, context?: EventContext): void {
     if (!this.options.eventPublisher) {
       return;
     }
 
     const cfg = this.options.eventPublisher;
     const event: RateLimitEvent = {
-      id: randomUUID(),
-      type: 'rate_limit.reset',
-      producer: cfg.producer,
-      producerVersion: cfg.producerVersion,
-      occurredAtMs: this.options.clock.nowMs(),
-      schemaVersion: RATE_LIMIT_EVENT_SCHEMA_VERSION['rate_limit.reset'],
-      ...(cfg.environment ? { environment: cfg.environment } : {}),
-      ...(cfg.region ? { region: cfg.region } : {}),
+      ...createEventEnvelope('rate_limit.reset', cfg, this.options.clock.nowMs(), context),
       payload: { deletedKeys: result.deletedCount },
     };
 
+    this.publishEvent(event);
+  }
+
+  private publishEvent(event: RateLimitEvent): void {
+    const publisher = this.options.eventPublisher?.publisher;
+
+    if (!publisher) {
+      return;
+    }
+
     this.runDetached(
-      cfg.publisher.publish(event).catch((error) => {
+      publisher.publish(event).catch((error) => {
         throw new EventPublishError(event.type, error);
       }),
     );
@@ -427,11 +476,7 @@ export class RateLimiter {
     );
 
     if (event) {
-      this.runDetached(
-        this.options.eventPublisher.publisher.publish(event).catch((error) => {
-          throw new EventPublishError(event.type, error);
-        }),
-      );
+      this.publishEvent(event);
     }
   }
 }

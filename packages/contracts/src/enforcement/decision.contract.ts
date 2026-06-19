@@ -64,7 +64,7 @@ export type RateLimitDecision =
       readonly type: 'shadow_only';
     }
   | {
-      readonly diagnostics?: RateLimitDiagnostics;
+      readonly diagnostics: RateLimitDiagnostics;
       readonly reason: BypassReason;
       readonly type: 'bypass';
     }
@@ -75,7 +75,7 @@ export type RateLimitDecision =
       readonly type: 'success';
     }
   | {
-      readonly diagnostics?: RateLimitDiagnostics;
+      readonly diagnostics: RateLimitDiagnostics;
       readonly enforcement: Extract<RateLimitEnforcement, { readonly type: 'degraded' }>;
       readonly evaluation?: DegradedRateLimitEvaluation;
       readonly failure: StoreFailure;

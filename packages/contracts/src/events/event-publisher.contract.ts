@@ -7,6 +7,8 @@ export interface EventPublisherHealthReport {
 }
 
 export interface EventPublisher {
+  readonly deliveryGuarantee: 'best-effort' | 'at-least-once';
+
   publish(event: RateLimitEvent): Promise<void>;
 
   publishBatch?(events: ReadonlyArray<RateLimitEvent>): Promise<void>;

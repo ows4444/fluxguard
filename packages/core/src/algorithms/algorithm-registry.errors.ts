@@ -14,18 +14,6 @@ export class AlgorithmAlreadyRegisteredError extends AlgorithmRegistryError {
   }
 }
 
-export class AlgorithmRegistryFrozenError extends AlgorithmRegistryError {
-  constructor() {
-    super('Algorithm registry frozen');
-  }
-}
-
-export class AlgorithmRegistryNotFrozenError extends AlgorithmRegistryError {
-  constructor() {
-    super('Algorithm registry accessed before freeze()');
-  }
-}
-
 export class AlgorithmNotRegisteredError extends AlgorithmRegistryError {
   constructor(id: string) {
     super(`Algorithm not registered: ${id}`);

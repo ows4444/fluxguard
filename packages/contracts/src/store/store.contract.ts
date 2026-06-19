@@ -43,4 +43,6 @@ export interface IRateLimitStore {
   peek(command: PeekCommand): Promise<PeekOutcome>;
 
   reset(command: RateLimiterResetCommand): Promise<ResetResult>;
+
+  dispose?(): void | Promise<void>;
 }

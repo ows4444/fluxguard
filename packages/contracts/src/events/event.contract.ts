@@ -1,6 +1,7 @@
-import type { BypassReason, RateLimitEvaluationSnapshot } from '../domain/rate-limit.shared';
-import type { DegradedRateLimitEvaluation } from '../enforcement/decision.contract';
+import type { BypassReason } from '../domain/rate-limit.shared';
+import type { DegradedRateLimitEvaluation, RateLimitEvaluation } from '../enforcement/decision.contract';
 import type { HttpMethod } from '../runtime/runtime.contract';
+import type { TracingContext } from '../runtime/tracing.contract';
 import type { StoreFailure, StoreFailureType } from '../store/store.failure';
 import { RATE_LIMIT_EVENT_SCHEMA_VERSION } from './event.constants';
 
@@ -50,12 +51,7 @@ export interface EventEnvelope<TType extends RateLimitEventType, TPayload> {
   readonly payload: TPayload;
 }
 
-export interface EventContext {
-  readonly causationId?: string;
-  readonly correlationId?: string;
-  readonly spanId?: string;
-  readonly traceId?: string;
-}
+export type EventContext = TracingContext;
 
 export interface BaseRateLimitEventPayload {
   readonly apiKeyId?: string;
@@ -65,13 +61,19 @@ export interface BaseRateLimitEventPayload {
   readonly cost: number;
   readonly evaluationDurationUs: number;
 
+  readonly algorithmDurationUs?: number;
+
+  readonly usedReplicaRead?: boolean;
+
+  readonly fromIdempotencyCache?: boolean;
+
   readonly ip: string;
 
   readonly method: HttpMethod;
 
   readonly route: string;
 
-  readonly evaluation: RateLimitEvaluationSnapshot;
+  readonly evaluation: RateLimitEvaluation;
 }
 
 export type RateLimitAllowedEventPayload = BaseRateLimitEventPayload;
@@ -107,14 +109,14 @@ export interface RateLimitDegradedEventPayload {
   readonly apiKeyId?: string;
   readonly userId?: string;
 
-  readonly ip?: string;
-  readonly method?: HttpMethod;
-  readonly route?: string;
+  readonly ip: string;
+  readonly method: HttpMethod;
+  readonly route: string;
 
   readonly evaluation?: DegradedRateLimitEvaluation;
 
-  readonly cost?: number;
-  readonly evaluationDurationUs?: number;
+  readonly cost: number;
+  readonly evaluationDurationUs: number;
 
   readonly failOpen: boolean;
   readonly storeFailureType: StoreFailureType;

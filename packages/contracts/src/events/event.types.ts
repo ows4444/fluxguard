@@ -12,6 +12,8 @@ export interface EventDefinition {
 
 export interface EventRegistryEntry extends EventDefinition {
   readonly schemaVersion: number;
+
+  readonly payloadRevision: string;
 }
 
 export type EventRegistry<TPayloadMap extends object> = {

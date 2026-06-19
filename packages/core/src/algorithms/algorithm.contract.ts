@@ -1,10 +1,14 @@
-import type { AlgorithmCapabilities } from '@fluxguard/contracts';
+import type { AlgorithmCapabilities, AlgorithmState, RateLimitAlgorithmId } from '@fluxguard/contracts';
 
 import type { EvaluationContext } from '../runtime/evaluation-context';
 import type { ShadowEvaluationContext } from '../runtime/shadow-evaluation-context';
 
 export interface AlgorithmResult {
   readonly allowed: boolean;
+
+  readonly fromIdempotencyCache?: boolean;
+
+  readonly fromReplica?: boolean;
 
   readonly burstConsumed?: boolean;
   readonly burstRemaining?: number;
@@ -14,6 +18,8 @@ export interface AlgorithmResult {
   readonly resetAtMs: number;
 
   readonly nextAllowedAtMs?: number;
+
+  readonly algorithmState?: AlgorithmState;
 }
 
 export interface RateLimitAlgorithm {
@@ -24,6 +30,7 @@ export interface RateLimitAlgorithm {
 }
 
 export interface RegisteredAlgorithm {
+  readonly id: RateLimitAlgorithmId;
   readonly capabilities: AlgorithmCapabilities;
   readonly implementation: RateLimitAlgorithm;
 }

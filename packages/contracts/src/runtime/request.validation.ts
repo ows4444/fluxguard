@@ -15,10 +15,6 @@ export interface RequestValidationResult {
 
 const VALID: RequestValidationResult = Object.freeze({ valid: true, errors: [] });
 
-function fail(field: string, message: string): RequestValidationResult {
-  return { valid: false, errors: [{ field, message }] };
-}
-
 export function validateRequest(request: RateLimitRequest): RequestValidationResult {
   const errors: RequestValidationError[] = [];
   const routeResult = parseRouteTemplate(request.route);

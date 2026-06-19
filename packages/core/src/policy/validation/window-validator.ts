@@ -1,4 +1,5 @@
 import {
+  type AlgorithmCapabilities,
   isCalendarMonthWindow,
   isFixedWindow,
   parseAnchorDay,
@@ -6,10 +7,12 @@ import {
   type PolicyValidationError,
   type RateLimitRule,
 } from '@fluxguard/contracts';
-import { AlgorithmCapabilitiesRegistry } from '@fluxguard/contracts';
-import { supportsWindowType } from '@fluxguard/contracts';
 
-export function validateWindow(rule: RateLimitRule, errors: PolicyValidationError[]): void {
+export function validateWindow(
+  rule: RateLimitRule,
+  errors: PolicyValidationError[],
+  capabilities: AlgorithmCapabilities | undefined,
+): void {
   const window = rule.quota.window;
 
   if (isFixedWindow(window)) {
@@ -36,15 +39,8 @@ export function validateWindow(rule: RateLimitRule, errors: PolicyValidationErro
     });
   }
 
-  if (!Object.prototype.hasOwnProperty.call(AlgorithmCapabilitiesRegistry, rule.execution.algorithm)) {
+  if (!capabilities) {
     return;
-  }
-
-  if (!supportsWindowType(rule.execution.algorithm, window.type)) {
-    errors.push({
-      path: ['rules', rule.id, 'quota', 'window'],
-      message: `window type "${window.type}" is not supported by algorithm "${rule.execution.algorithm}"`,
-    });
   }
 
   if (window.anchorDay !== undefined) {

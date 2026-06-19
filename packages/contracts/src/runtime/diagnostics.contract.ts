@@ -7,6 +7,8 @@ export interface RateLimitDiagnostics {
 
   readonly primaryStoreDurationUs?: number;
 
+  readonly fromIdempotencyCache?: boolean;
+
   readonly retryCount?: number;
 
   readonly usedReplicaRead?: boolean;

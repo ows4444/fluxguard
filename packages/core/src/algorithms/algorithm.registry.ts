@@ -1,50 +1,40 @@
-import type { RateLimitAlgorithmId } from '@fluxguard/contracts';
+import { AlgorithmCapabilitiesRegistry, type RateLimitAlgorithmId } from '@fluxguard/contracts';
 
 import type { RateLimitAlgorithm, RegisteredAlgorithm } from './algorithm.contract';
-import {
-  AlgorithmAlreadyRegisteredError,
-  AlgorithmNotRegisteredError,
-  AlgorithmRegistryFrozenError,
-  AlgorithmRegistryNotFrozenError,
-} from './algorithm-registry.errors';
+import { AlgorithmAlreadyRegisteredError, AlgorithmNotRegisteredError } from './algorithm-registry.errors';
 
 export class AlgorithmRegistry {
-  private readonly algorithms = new Map<RateLimitAlgorithmId, RegisteredAlgorithm>();
-  private frozen = false;
+  private constructor(private readonly algorithms: ReadonlyMap<RateLimitAlgorithmId, RegisteredAlgorithm>) {}
 
   static create(registrations: ReadonlyArray<readonly [RateLimitAlgorithmId, RegisteredAlgorithm]>): AlgorithmRegistry {
-    const registry = new AlgorithmRegistry();
+    const algorithms = new Map<RateLimitAlgorithmId, RegisteredAlgorithm>();
 
     for (const [id, registration] of registrations) {
-      registry.register(id, registration);
+      const expected = AlgorithmCapabilitiesRegistry[id];
+
+      if (!expected) {
+        throw new AlgorithmNotRegisteredError(id);
+      }
+
+      if (
+        registration.capabilities.storeMode !== expected.storeMode ||
+        registration.capabilities.supportsBurstLimit !== expected.supportsBurstLimit ||
+        registration.capabilities.supportsRefillRate !== expected.supportsRefillRate
+      ) {
+        throw new Error(`Algorithm capability mismatch for ${id}`);
+      }
+
+      if (algorithms.has(id)) {
+        throw new AlgorithmAlreadyRegisteredError(id);
+      }
+
+      algorithms.set(id, registration);
     }
 
-    registry.freeze();
-
-    return registry;
-  }
-
-  register(id: RateLimitAlgorithmId, registration: RegisteredAlgorithm): void {
-    if (this.frozen) {
-      throw new AlgorithmRegistryFrozenError();
-    }
-
-    if (this.algorithms.has(id)) {
-      throw new AlgorithmAlreadyRegisteredError(id);
-    }
-
-    this.algorithms.set(id, registration);
-  }
-
-  freeze(): void {
-    this.frozen = true;
+    return new AlgorithmRegistry(algorithms);
   }
 
   has(id: RateLimitAlgorithmId): boolean {
-    if (!this.frozen) {
-      throw new AlgorithmRegistryNotFrozenError();
-    }
-
     return this.algorithms.has(id);
   }
 
@@ -53,10 +43,6 @@ export class AlgorithmRegistry {
   }
 
   getRegistration(id: RateLimitAlgorithmId): RegisteredAlgorithm {
-    if (!this.frozen) {
-      throw new AlgorithmRegistryNotFrozenError();
-    }
-
     const registration = this.algorithms.get(id);
 
     if (!registration) {

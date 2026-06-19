@@ -10,16 +10,11 @@ export class DefaultRequestIdentityProvider implements RequestIdentityProvider {
       return undefined;
     }
 
+    const cost = request.cost ?? DEFAULT_REQUEST_COST;
+
     return createHash('sha256')
       .update(
-        JSON.stringify({
-          ruleId,
-          rateLimitKey,
-          idempotencyKey: request.idempotencyKey,
-          route: request.route,
-          method: request.method,
-          cost: request.cost ?? DEFAULT_REQUEST_COST,
-        }),
+        [ruleId ?? '', rateLimitKey, request.idempotencyKey, request.route, request.method, String(cost)].join('|'),
       )
       .digest('hex');
   }

@@ -1,36 +1,18 @@
-import { randomUUID } from 'node:crypto';
-
 import {
-  assertNever,
   type Clock,
   DEFAULT_REQUEST_COST,
   type EventContext,
-  RATE_LIMIT_EVENT_SCHEMA_VERSION,
   type RateLimitDecision,
-  type RateLimitEvaluationSnapshot,
   type RateLimitEvent,
-  type RateLimitEventType,
   type RateLimitRequest,
 } from '@fluxguard/contracts';
 
 import type { EventPublisherConfig } from '../rate-limiter';
-
-function createBasePayload(
-  request: RateLimitRequest,
-  evaluationDurationUs: number,
-  evaluation: RateLimitEvaluationSnapshot,
-) {
-  return {
-    ip: request.ip,
-    method: request.method,
-    route: request.route,
-    cost: request.cost ?? DEFAULT_REQUEST_COST,
-    evaluationDurationUs,
-    evaluation,
-    ...(request.apiKeyId && { apiKeyId: request.apiKeyId }),
-    ...(request.userId && { userId: request.userId }),
-  };
-}
+import { createEventEnvelope } from './event-envelope';
+import { createBaseEvaluationPayload } from './event-payloads';
+import { createEventSubject } from './event-subject';
+import { DECISION_EVENT_TYPES } from './event-type-map';
+import { createSuccessEvent } from './success-event-builder';
 
 export function createDecisionEvent(
   decision: RateLimitDecision,
@@ -40,24 +22,9 @@ export function createDecisionEvent(
   context?: EventContext,
   occurredAtMs = clock.nowMs(),
 ): RateLimitEvent | null {
-  const envelope = <T extends RateLimitEventType>(type: T) => ({
-    id: randomUUID(),
-    type,
-    producer: cfg.producer,
-    producerVersion: cfg.producerVersion,
-    occurredAtMs,
-    schemaVersion: RATE_LIMIT_EVENT_SCHEMA_VERSION[type],
-    ...(context?.correlationId ? { correlationId: context.correlationId } : {}),
-    ...(context?.causationId ? { causationId: context.causationId } : {}),
-    ...(context?.traceId ? { traceId: context.traceId } : {}),
-    ...(context?.spanId ? { spanId: context.spanId } : {}),
-    ...(cfg.environment ? { environment: cfg.environment } : {}),
-    ...(cfg.region ? { region: cfg.region } : {}),
-  });
-
   if (decision.type === 'policy_miss') {
     return {
-      ...envelope('rate_limit.policy_miss'),
+      ...createEventEnvelope(DECISION_EVENT_TYPES.policy_miss, cfg, occurredAtMs, context),
       payload: {
         method: request.method,
         route: request.route,
@@ -67,7 +34,7 @@ export function createDecisionEvent(
 
   if (decision.type === 'rule_miss') {
     return {
-      ...envelope('rate_limit.rule_miss'),
+      ...createEventEnvelope(DECISION_EVENT_TYPES.rule_miss, cfg, occurredAtMs, context),
       payload: {
         method: request.method,
         route: request.route,
@@ -77,38 +44,27 @@ export function createDecisionEvent(
 
   if (decision.type === 'bypass') {
     return {
-      ...envelope('rate_limit.bypassed'),
+      ...createEventEnvelope(DECISION_EVENT_TYPES.bypass, cfg, occurredAtMs, context),
       payload: {
         ip: request.ip,
         method: request.method,
         route: request.route,
         cost: request.cost ?? DEFAULT_REQUEST_COST,
-        evaluationDurationUs: decision.diagnostics?.totalEvaluationDurationUs ?? 0,
+        evaluationDurationUs: decision.diagnostics?.totalEvaluationDurationUs,
         bypassReason: decision.reason,
-        ...(request.apiKeyId ? { apiKeyId: request.apiKeyId } : {}),
-        ...(request.userId ? { userId: request.userId } : {}),
+        ...createEventSubject(request),
       },
     };
   }
 
   if (decision.type === 'degraded') {
     return {
-      ...envelope('rate_limit.degraded'),
+      ...createEventEnvelope(DECISION_EVENT_TYPES.degraded, cfg, occurredAtMs, context),
       payload: {
         failOpen: decision.enforcement.failOpen,
         storeFailureType: decision.enforcement.storeFailureType,
 
-        ...(decision.evaluation
-          ? {
-              evaluation: {
-                source: decision.evaluation.source,
-                ...(decision.evaluation.ruleId !== undefined ? { ruleId: decision.evaluation.ruleId } : {}),
-                ...(decision.evaluation.remaining !== undefined ? { remaining: decision.evaluation.remaining } : {}),
-                ...(decision.evaluation.resetAtMs !== undefined ? { resetAtMs: decision.evaluation.resetAtMs } : {}),
-                ...(decision.evaluation.stale !== undefined ? { stale: decision.evaluation.stale } : {}),
-              },
-            }
-          : {}),
+        ...(decision.evaluation ? { evaluation: decision.evaluation } : {}),
 
         retryable: decision.failure.retryable,
         transient: decision.failure.transient,
@@ -121,12 +77,9 @@ export function createDecisionEvent(
         route: request.route,
         cost: request.cost ?? DEFAULT_REQUEST_COST,
 
-        ...(decision.diagnostics?.totalEvaluationDurationUs !== undefined
-          ? { evaluationDurationUs: decision.diagnostics.totalEvaluationDurationUs }
-          : {}),
+        evaluationDurationUs: decision.diagnostics?.totalEvaluationDurationUs,
 
-        ...(request.apiKeyId ? { apiKeyId: request.apiKeyId } : {}),
-        ...(request.userId ? { userId: request.userId } : {}),
+        ...createEventSubject(request),
       },
     };
   }
@@ -135,54 +88,15 @@ export function createDecisionEvent(
     return null;
   }
 
-  const evaluationPayload = createBasePayload(
+  const evaluationPayload = createBaseEvaluationPayload(
     request,
-    decision.diagnostics?.totalEvaluationDurationUs ?? 0,
+    decision.diagnostics ?? {
+      totalEvaluationDurationUs: 0,
+    },
     decision.evaluation,
   );
 
-  switch (decision.enforcement.type) {
-    case 'allow':
-      return {
-        ...envelope('rate_limit.allowed'),
-        payload: evaluationPayload,
-      };
-
-    case 'allow_burst':
-      return {
-        ...envelope('rate_limit.allowed_burst'),
-        payload: {
-          ...evaluationPayload,
-          burstRemaining: decision.enforcement.burstRemaining,
-        },
-      };
-
-    case 'reject':
-      return {
-        ...envelope('rate_limit.rejected'),
-        payload: {
-          ...evaluationPayload,
-          retryAfterMs: decision.enforcement.retryAfterMs,
-        },
-      };
-
-    case 'throttle':
-      return {
-        ...envelope('rate_limit.throttled'),
-        payload: {
-          ...evaluationPayload,
-          retryAfterMs: decision.enforcement.retryAfterMs,
-          shedProbability: decision.enforcement.shedProbability,
-        },
-      };
-
-    case 'shadow':
-      return {
-        ...envelope('rate_limit.shadow'),
-        payload: evaluationPayload,
-      };
-
-    default:
-      return assertNever(decision.enforcement);
-  }
+  return createSuccessEvent(decision, evaluationPayload, (type) =>
+    createEventEnvelope(type, cfg, occurredAtMs, context),
+  );
 }
